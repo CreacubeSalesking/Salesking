@@ -2559,7 +2559,11 @@ function saveMapsKey() {
   const mapId = document.getElementById('cfgMapsId').value.trim();
   if (!key) { alert('Bitte Google Maps API-Key eingeben.'); return; }
   localStorage.setItem('fieldcrm_mapskey', key);
-  if (mapId) localStorage.setItem('fieldcrm_mapsid', mapId);
+  if (mapId) {
+    localStorage.setItem('fieldcrm_mapsid', mapId);
+  } else {
+    localStorage.removeItem('fieldcrm_mapsid');
+  }
   document.getElementById('mapsStatus').textContent = '✓ Gespeichert';
   document.getElementById('mapsStatus').style.background = '#EAF3DE';
   document.getElementById('mapsStatus').style.color = '#3B6D11';
@@ -2834,10 +2838,11 @@ async function initialisiereKarte() {
   const ph = document.getElementById('mapPlaceholder');
   if (ph) ph.style.display = 'none';
 
-  // Klassische Map – keine Map ID nötig, zeigt immer Straßen
+  // Klassische Map ohne mapId – funktioniert immer
   gMap = new google.maps.Map(container, {
     center: { lat: 49.5897, lng: 11.0078 },
     zoom: 9,
+    mapTypeId: google.maps.MapTypeId.ROADMAP,
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: true,
