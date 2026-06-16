@@ -1,0 +1,3426 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FieldCRM – Außendienst-Suite</title>
+
+  <!-- Supabase Bibliothek -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <style>
+    /* ── CSS-Variablen (helles Theme) ── */
+    :root {
+      --color-background-primary:    #FFFFFF;
+      --color-background-secondary:  #F7F5EF;
+      --color-background-tertiary:   #F1EFE8;
+      --color-text-primary:          #1A1A1A;
+      --color-text-secondary:        #5F5E5A;
+      --color-text-tertiary:         #9B9891;
+      --color-border-tertiary:       #E3E1D8;
+      --color-border-secondary:      #CFCDC4;
+      --font-sans:                   -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --border-radius-md:            6px;
+      --border-radius-lg:            10px;
+      --nav-w:                       220px;
+      --accent:                      #8FBF00;
+      --accent-dim:                  #6a8f00;
+      --accent-bg:                   rgba(143,191,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-background-tertiary);
+      color: var(--color-text-primary);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: var(--nav-w);
+      background: var(--color-background-primary);
+      border-right: 0.5px solid var(--color-border-tertiary);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #sidebar .logo { padding: 20px 18px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    #sidebar .logo span { font-size: 18px; font-weight: 500; letter-spacing: -0.5px; }
+    #sidebar .logo small { display: block; font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+    nav { flex: 1; overflow-y: auto; padding: 8px 0; }
+    nav a {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 18px; font-size: 13px;
+      color: var(--color-text-secondary); cursor: pointer; text-decoration: none;
+    }
+    nav a:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+    nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
+    nav a i { font-size: 17px; width: 20px; flex-shrink: 0; }
+    nav .section-label {
+      font-size: 10px; font-weight: 500; color: var(--color-text-tertiary);
+      text-transform: uppercase; letter-spacing: 0.08em; padding: 12px 18px 4px;
+    }
+    #sidebar .user-box {
+      padding: 14px 18px; border-top: 0.5px solid var(--color-border-tertiary);
+      display: flex; align-items: center; gap: 10px;
+    }
+
+    /* ── Haupt-Bereich ── */
+    #main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .topbar {
+      background: var(--color-background-primary);
+      border-bottom: 0.5px solid var(--color-border-tertiary);
+      padding: 12px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+      position: sticky; top: 0; z-index: 5;
+    }
+    .topbar h1 { font-size: 15px; font-weight: 500; flex: 1; }
+    .content { flex: 1; padding: 20px 24px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    /* Karten-Container immer im DOM behalten damit Google Maps korrekt rendert */
+    #googleMap {
+      width: 100%;
+      height: 320px;
+      border-radius: var(--border-radius-md);
+      background: var(--color-background-secondary);
+      position: relative;
+      min-height: 320px;
+    }
+    .view.active { display: block; }
+
+    /* ── Komponenten ── */
+    .avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--accent-bg); display: flex; align-items: center;
+      justify-content: center; font-size: 13px; font-weight: 500;
+      color: var(--accent); flex-shrink: 0;
+    }
+    .avatar-lg {
+      width: 42px; height: 42px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 500; flex-shrink: 0;
+    }
+    .badge {
+      background: var(--accent-bg); color: var(--accent);
+      font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 500;
+    }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--border-radius-md);
+      border: 0.5px solid var(--color-border-secondary);
+      background: var(--color-background-primary);
+      color: var(--color-text-primary); font-size: 13px;
+      cursor: pointer; font-family: var(--font-sans); text-decoration: none;
+    }
+    .btn:hover { background: var(--color-background-secondary); }
+    .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn.primary:hover { background: var(--accent-dim); }
+    .btn.call  { background: #EAF3DE; color: #3B6D11; border-color: #C0DD97; }
+    .btn.call:hover  { background: #C0DD97; }
+    .btn.mail  { background: #E6F1FB; color: #185FA5; border-color: #B5D4F4; }
+    .btn.mail:hover  { background: #B5D4F4; }
+    .btn.sms   { background: #FAEEDA; color: #854F0B; border-color: #FAC775; }
+    .btn.sms:hover   { background: #FAC775; }
+    .pill {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 99px; font-size: 11px; font-weight: 500;
+    }
+    .pill.green  { background: #EAF3DE; color: #3B6D11; }
+    .pill.amber  { background: #FAEEDA; color: #854F0B; }
+    .pill.blue   { background: #E6F1FB; color: #185FA5; }
+    .pill.gray   { background: #F1EFE8; color: #5F5E5A; }
+    .pill.red    { background: #FCEBEB; color: #A32D2D; }
+
+    /* ── Grid & Karten ── */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 16px; }
+    .kpi-label { font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .kpi-val   { font-size: 22px; font-weight: 500; }
+    .kpi-delta { font-size: 12px; margin-top: 4px; }
+    .kpi-delta.up   { color: #639922; }
+    .kpi-delta.down { color: #A32D2D; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 18px; }
+    .card-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .card-hd h3 { font-size: 14px; font-weight: 500; }
+
+    /* ── Tabelle ── */
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); font-weight: 500; text-align: left; padding: 6px 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    tbody tr { border-bottom: 0.5px solid var(--color-border-tertiary); cursor: pointer; }
+    tbody tr:hover { background: var(--color-background-secondary); }
+    tbody td { padding: 9px 10px; vertical-align: middle; }
+
+    /* ── Kontakt-Karten ── */
+    .contact-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 16px; margin-bottom: 10px; }
+    .contact-card:last-child { margin-bottom: 0; }
+    .contact-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .contact-actions { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 10px; border-top: 0.5px solid var(--color-border-tertiary); }
+    .contact-role { font-size: 12px; color: var(--color-text-secondary); font-weight: 500; }
+    .contact-meta { font-size: 12px; color: var(--color-text-tertiary); margin-top: 2px; }
+    .info-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .info-row:last-child { border-bottom: none; }
+    .info-row i { font-size: 15px; color: var(--color-text-tertiary); width: 18px; flex-shrink: 0; }
+    .info-row a { color: var(--color-text-primary); text-decoration: none; }
+    .info-row a:hover { color: var(--accent); }
+    .info-row .action-link { margin-left: auto; font-size: 12px; }
+
+    /* ── Detail-Panel (Overlay) ── */
+    #detailPanel { display: none; position: fixed; top: 0; left: var(--nav-w); right: 0; bottom: 0; background: var(--color-background-primary); z-index: 20; overflow-y: auto; padding: 20px 28px; }
+    #detailPanel.open { display: block; }
+    .back-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); cursor: pointer; margin-bottom: 16px; }
+    .back-btn:hover { color: var(--color-text-primary); }
+    .section-divider { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-text-tertiary); font-weight: 500; margin: 18px 0 10px; padding-bottom: 6px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+
+    /* ── Formular ── */
+    .form-group { margin-bottom: 12px; }
+    .form-group label { font-size: 12px; color: var(--color-text-secondary); display: block; margin-bottom: 4px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; font-size: 13px; border: 0.5px solid var(--color-border-secondary);
+      border-radius: var(--border-radius-md); padding: 7px 10px;
+      background: var(--color-background-primary); color: var(--color-text-primary);
+      font-family: var(--font-sans);
+    }
+    .form-group textarea { resize: vertical; min-height: 65px; }
+
+    /* ── Verlauf ── */
+    .history-item { display: flex; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 13px; }
+    .history-item:last-child { border-bottom: none; }
+    .history-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+
+    /* ── Stat-Reihe ── */
+    .stat-row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 13px; }
+    .stat-row:last-child { border-bottom: none; }
+    .prog-bar { height: 4px; background: var(--color-background-secondary); border-radius: 2px; overflow: hidden; width: 80px; }
+    .prog-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+
+    /* ── CSV-Import ── */
+    .csv-step { display: none; }
+    .csv-step.active { display: block; }
+    .col-map-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px; }
+    .col-map-row label { width: 140px; flex-shrink: 0; color: var(--color-text-secondary); }
+    .col-map-row select { flex: 1; }
+
+    /* ── Kalender ── */
+    .cal-header { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; margin-bottom: 4px; }
+    .cal-header span { font-size: 10px; text-align: center; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 0; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+    .cal-day { min-height: 56px; border-radius: 6px; border: 0.5px solid var(--color-border-tertiary); padding: 6px; font-size: 11px; color: var(--color-text-secondary); cursor: pointer; background: var(--color-background-primary); }
+    .cal-day:hover { background: var(--color-background-secondary); }
+    .cal-day.today { border-color: var(--accent); }
+    .cal-day.has-visit { background: var(--accent-bg); }
+    .cal-day .day-num { font-weight: 500; margin-bottom: 3px; color: var(--color-text-primary); }
+    .cal-day.today .day-num { color: var(--accent); }
+    .cal-visit-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); display: inline-block; margin-right: 2px; }
+
+    /* ── Tags / Einstellungen ── */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); font-size: 12px; cursor: pointer; }
+    .tag.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+    /* ── Karte Platzhalter ── */
+    .map-placeholder { background: var(--color-background-secondary); border-radius: var(--border-radius-md); height: 240px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--color-text-tertiary); font-size: 13px; position: relative; overflow: hidden; }
+
+    /* ── Toggle ── */
+    .toggle { width: 32px; height: 18px; background: var(--color-background-secondary); border-radius: 99px; cursor: pointer; position: relative; border: 0.5px solid var(--color-border-secondary); flex-shrink: 0; }
+    .toggle.on { background: var(--accent); border-color: var(--accent); }
+    .toggle::after { content: ''; position: absolute; width: 12px; height: 12px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: left 0.15s; }
+    .toggle.on::after { left: 16px; }
+
+    /* ── Verbindungsstatus ── */
+    #dbStatus { font-size: 11px; padding: 3px 8px; border-radius: 99px; }
+    #dbStatus.ok   { background: #EAF3DE; color: #3B6D11; }
+    #dbStatus.err  { background: #FCEBEB; color: #A32D2D; }
+    #dbStatus.wait { background: #F1EFE8; color: #5F5E5A; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      :root { --nav-w: 0px; }
+      #sidebar {
+        display: flex;
+        position: fixed;
+        left: -240px;
+        top: 0; bottom: 0;
+        width: 240px;
+        z-index: 50;
+        transition: left 0.25s ease;
+        box-shadow: none;
+      }
+      #sidebar.open {
+        left: 0;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+      }
+      #mobileOverlay.open { display: block; }
+      #hamburger { display: flex !important; }
+      #detailPanel { left: 0; }
+      .kpi-grid { grid-template-columns: 1fr 1fr; }
+      .grid2, .grid3 { grid-template-columns: 1fr; }
+      .content { padding: 14px 14px; }
+      .topbar { padding: 10px 14px; }
+    }
+    #hamburger {
+      display: none; /* Desktop: versteckt */
+      align-items: center;
+      justify-content: center;
+      width: 36px; height: 36px;
+      border-radius: var(--border-radius-md);
+      border: 0.5px solid var(--color-border-secondary);
+      background: var(--color-background-primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    #hamburger i { font-size: 20px; }
+    #mobileOverlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 49;
+    }
+    #mobileOverlay.open { display: block; }
+    @media (max-width: 768px) {
+      #hamburger { display: flex !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Mobile Overlay -->
+<div id="mobileOverlay" onclick="closeSidebar()"></div>
+
+<!-- ═══════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════ -->
+<div id="sidebar">
+  <div class="logo">
+    <span>Field<strong>CRM</strong></span>
+    <small>Außendienst-Suite</small>
+  </div>
+  <nav>
+    <div class="section-label">Hauptmenü</div>
+    <a onclick="showView('dashboard')"><i class="ti ti-layout-dashboard"></i>Dashboard</a>
+    <a class="active" onclick="showView('kunden')"><i class="ti ti-users"></i>Kunden</a>
+    <a onclick="showView('route')"><i class="ti ti-route"></i>Route & Karte</a>
+    <a onclick="showView('kalender')"><i class="ti ti-calendar"></i>Kalender</a>
+    <a onclick="showView('vorbereitung')"><i class="ti ti-clipboard-text"></i>Besuchsvorbereitung</a>
+    <div class="section-label">Verwaltung</div>
+    <a onclick="showView('import')"><i class="ti ti-upload"></i>CSV-Import</a>
+    <a onclick="showView('einstellungen')"><i class="ti ti-settings"></i>Einstellungen</a>
+  </nav>
+  <div class="user-box">
+    <div class="avatar">WO</div>
+    <div>
+      <strong style="font-size:13px">Wo</strong>
+      <small style="display:block;font-size:11px;color:var(--color-text-tertiary)">Nordbayern · NBW · BW</small>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     HAUPT-BEREICH
+═══════════════════════════════════════════ -->
+<div id="main">
+  <div class="topbar">
+    <button id="hamburger" onclick="toggleSidebar()" aria-label="Menü öffnen">
+      <i class="ti ti-menu-2"></i>
+    </button>
+    <h1 id="view-title">Kunden</h1>
+    <span class="badge" id="view-badge">–</span>
+    <span id="dbStatus" class="wait">Verbinde…</span>
+    <button class="btn" onclick="showView('import')"><i class="ti ti-upload"></i>CSV Update</button>
+  </div>
+
+  <div class="content">
+
+    <!-- ── KUNDEN ── -->
+    <div class="view active" id="v-kunden">
+      <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <input type="text" id="searchInput" placeholder="Suche Kunde, Ort, Ansprechpartner…"
+          style="flex:1;min-width:200px;font-size:13px;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)"
+          oninput="filterKunden(this.value)">
+        <select id="filterBranche" onchange="filterKunden(document.getElementById('searchInput').value)"
+          style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+          <option value="">Alle Branchen</option>
+        </select>
+        <button class="btn primary" onclick="openNeuKunde()"><i class="ti ti-plus"></i>Neuer Kunde</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table>
+          <thead><tr>
+            <th>Kunde</th><th>Ansprechpartner</th><th>Kontakt direkt</th>
+            <th>Ort</th><th>Letzter Besuch</th><th>Umsatz</th><th>Trend</th>
+          </tr></thead>
+          <tbody id="kundenBody">
+            <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--color-text-tertiary)">Lade Daten…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ── -->
+    <div class="view" id="v-dashboard">
+      <div class="kpi-grid" id="dashKpis">
+        <div class="kpi-card"><div class="kpi-label">Kunden gesamt</div><div class="kpi-val" id="kpiKunden">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">Ansprechpartner</div><div class="kpi-val" id="kpiAP">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">Umsatz (letzte KW)</div><div class="kpi-val" id="kpiUmsatz">–</div></div>
+        <div class="kpi-card"><div class="kpi-label">Nachfassen</div><div class="kpi-val" id="kpiNachfassen">–</div></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hd"><h3>Umsatz – letzte 8 Wochen</h3></div>
+          <div style="position:relative;height:180px"><canvas id="dashChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>Top Artikelgruppen</h3></div>
+          <div id="artGruppenStats"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><h3>Letzte Aktivitäten</h3></div>
+        <table><thead><tr><th>Kunde</th><th>Ansprechpartner</th><th>Letzter Besuch</th><th>Umsatz</th><th>Status</th></tr></thead>
+        <tbody id="dashAktivitaeten"></tbody></table>
+      </div>
+    </div>
+
+    <!-- ── ROUTE ── -->
+    <div class="view" id="v-route">
+
+      <!-- Karte + Unbekannte nebeneinander -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Karte -->
+        <div class="card">
+          <div class="card-hd">
+            <h3 id="mapCardTitle">Karte – Route</h3>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:12px;color:var(--color-text-secondary)">Unbekannte</span>
+              <div class="toggle on" id="unknownToggle" onclick="toggleUnknownPins()" title="Unbekannte Unternehmen ein-/ausblenden"></div>
+              <button class="btn" style="padding:4px 10px;font-size:11px" onclick="sucheUnbekannteOnRoute()"><i class="ti ti-search" style="font-size:12px"></i>Places suchen</button>
+            </div>
+          </div>
+          <!-- Google Maps Container -->
+          <div id="googleMap">
+            <div id="mapPlaceholder" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--color-text-tertiary)">
+              <i class="ti ti-map-off" style="font-size:36px"></i>
+              <div style="font-size:13px;font-weight:500">Karte wird geladen…</div>
+              <div style="font-size:12px;text-align:center;max-width:240px">Google Maps API-Key in den <span style="color:var(--accent);cursor:pointer" onclick="showView('einstellungen')">Einstellungen</span> hinterlegen</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn" style="flex:1;min-width:120px" onclick="optimiereRoute()"><i class="ti ti-adjustments"></i>Route optimieren</button>
+            <button class="btn primary" style="flex:1;min-width:120px" onclick="starteNavigation()"><i class="ti ti-navigation"></i>Navigation starten</button>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--color-text-tertiary)">
+            <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8FBF00;margin-right:4px;vertical-align:-1px"></span>Kunden</span>
+            <span id="unknownLegend"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#E24B4A;margin-right:4px;vertical-align:-1px"></span>Unbekannte Firmen</span>
+          </div>
+        </div>
+
+        <!-- Unbekannte Firmen Panel -->
+        <div class="card">
+          <div class="card-hd"><h3>Unbekannte Firmen</h3><span class="badge" id="unknownCount">3</span></div>
+          <p style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:12px">Entlang der geplanten Route gefunden – passend zu deinen Branchen-Filtern.</p>
+          <div id="unknownList">
+            <div class="unknown-firm-row" data-id="u1">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+                <div class="toggle on" onclick="toggleUnknownFirm(this,'u1')"></div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">Wohnaccessoires Müller</div>
+                  <div style="font-size:11px;color:var(--color-text-tertiary)">Neustadt a.A. · Einzelhandel</div>
+                </div>
+                <button class="btn" style="padding:3px 8px;font-size:11px" onclick="addUnknownToRoute('Wohnaccessoires Müller','Neustadt a.A.')"><i class="ti ti-plus" style="font-size:12px"></i>Route</button>
+              </div>
+            </div>
+            <div class="unknown-firm-row" data-id="u2">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+                <div class="toggle on" onclick="toggleUnknownFirm(this,'u2')"></div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">Blumen & Deko Huber</div>
+                  <div style="font-size:11px;color:var(--color-text-tertiary)">Ansbach · Floristik</div>
+                </div>
+                <button class="btn" style="padding:3px 8px;font-size:11px" onclick="addUnknownToRoute('Blumen & Deko Huber','Ansbach')"><i class="ti ti-plus" style="font-size:12px"></i>Route</button>
+              </div>
+            </div>
+            <div class="unknown-firm-row" data-id="u3">
+              <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+                <div class="toggle on" onclick="toggleUnknownFirm(this,'u3')"></div>
+                <div style="flex:1">
+                  <div style="font-size:13px;font-weight:500">Landhausküche Brandt</div>
+                  <div style="font-size:11px;color:var(--color-text-tertiary)">Rothenburg · Inneneinrichtung</div>
+                </div>
+                <button class="btn" style="padding:3px 8px;font-size:11px" onclick="addUnknownToRoute('Landhausküche Brandt','Rothenburg')"><i class="ti ti-plus" style="font-size:12px"></i>Route</button>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--color-border-tertiary);font-size:12px;color:var(--color-text-tertiary)">
+            <i class="ti ti-filter" style="font-size:13px;vertical-align:-1px"></i>
+            Filter: Deko · Floristik · Einzelhandel · Inneneinrichtung
+          </div>
+        </div>
+      </div>
+
+      <!-- Tagesroute Tabelle -->
+      <div class="card">
+        <div class="card-hd">
+          <h3>Tagesroute – Schnellkontakt</h3>
+          <span style="font-size:12px;color:var(--color-text-tertiary)">Direkt anrufen oder mailen</span>
+        </div>
+        <table>
+          <thead><tr><th style="width:30px">#</th><th>Kunde</th><th>Hauptansprechpartner</th><th>Kontakt direkt</th><th style="width:80px">Letzter Besuch</th><th style="width:100px">Aktion</th></tr></thead>
+          <tbody id="routeBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── KALENDER ── -->
+    <div class="view" id="v-kalender">
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;align-items:start">
+
+        <!-- Monatskalender -->
+        <div class="card">
+          <div class="card-hd">
+            <h3 id="calTitle">Mai 2026</h3>
+            <div style="display:flex;gap:6px">
+              <button class="btn" style="padding:4px 8px" onclick="calPrev()"><i class="ti ti-chevron-left"></i></button>
+              <button class="btn" style="padding:4px 8px" onclick="calNext()"><i class="ti ti-chevron-right"></i></button>
+              <button class="btn primary" style="padding:5px 12px;font-size:12px" onclick="openTerminDialog()"><i class="ti ti-plus"></i>Termin</button>
+            </div>
+          </div>
+          <div class="cal-header"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+          <div class="cal-grid" id="calGrid"></div>
+          <!-- Tages-Termine -->
+          <div id="calDayTermine" style="margin-top:14px;display:none">
+            <div style="font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin-bottom:8px" id="calDayLabel"></div>
+            <div id="calDayList" style="display:flex;flex-direction:column;gap:6px"></div>
+          </div>
+        </div>
+
+        <!-- Heutige Termine -->
+        <div class="card">
+          <div class="card-hd"><h3>Heute</h3></div>
+          <div id="calToday" style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:12px;color:var(--color-text-tertiary)">Keine Termine heute</div>
+          </div>
+        </div>
+
+        <!-- Terminvorschläge -->
+        <div class="card" style="border-color:#FAC775">
+          <div class="card-hd">
+            <h3 style="display:flex;align-items:center;gap:6px"><i class="ti ti-alert-triangle" style="color:#854F0B;font-size:15px"></i>Terminvorschläge</h3>
+          </div>
+          <div style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:10px">Letzte Lieferung &gt; 3 Monate</div>
+          <div id="terminVorschlaege" style="display:flex;flex-direction:column;gap:6px">
+            <div style="font-size:12px;color:var(--color-text-tertiary)">Wird geladen…</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── BESUCHSVORBEREITUNG ── -->
+    <div class="view" id="v-vorbereitung">
+      <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+        <select id="prepSelect" onchange="loadPrep()"
+          style="font-size:14px;font-weight:500;padding:8px 12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+          <option value="">– Kunde wählen –</option>
+        </select>
+        <span id="prepStatus"></span>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <button class="btn" onclick="exportPrepPdf()" id="prepPdfBtn" style="display:none">
+            <i class="ti ti-file-type-pdf" style="color:#A32D2D"></i>PDF exportieren
+          </button>
+        </div>
+      </div>
+      <div id="prepContent"></div>
+    </div>
+
+    <!-- ── CSV-IMPORT ── -->
+    <div class="view" id="v-import">
+      <div class="card" style="max-width:660px">
+        <div class="card-hd"><h3>CSV-Import</h3><span class="badge" id="csvStepLabel">Schritt 1 von 3</span></div>
+
+        <!-- Schritt 1: Datei wählen -->
+        <div class="csv-step active" id="csv1">
+          <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">
+            Lade deine wöchentliche Kundenliste hoch. Das Spalten-Mapping wird einmalig festgelegt und danach automatisch verwendet.
+          </p>
+          <div id="dropZone"
+            style="border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:40px;text-align:center;background:var(--color-background-secondary);cursor:pointer"
+            onclick="document.getElementById('csvFile').click()"
+            ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+            ondragleave="this.style.borderColor=''"
+            ondrop="handleDrop(event)">
+            <i class="ti ti-upload" style="font-size:36px;color:var(--color-text-tertiary)"></i>
+            <div style="margin-top:10px;font-size:14px;font-weight:500">CSV-Datei hier ablegen</div>
+            <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:4px">oder klicken zum Auswählen</div>
+            <button class="btn primary" style="margin-top:16px" onclick="event.stopPropagation();document.getElementById('csvFile').click()">
+              <i class="ti ti-folder-open"></i>Datei auswählen
+            </button>
+          </div>
+          <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+
+          <div id="savedMappingHint" style="display:none;margin-top:12px;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-tertiary)">
+            <strong style="color:var(--color-text-secondary)">Gespeichertes Mapping erkannt</strong> –
+            <span id="savedMappingFields"></span>
+            <span style="color:var(--accent);cursor:pointer;margin-left:4px" onclick="runImport()">Direkt importieren ›</span>
+          </div>
+        </div>
+
+        <!-- Schritt 2: Spalten zuordnen -->
+        <div class="csv-step" id="csv2">
+          <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:16px">
+            Ordne die App-Felder den Spalten deiner CSV zu. Diese Einstellung wird gespeichert.
+          </p>
+          <div id="mappingRows"></div>
+          <div style="display:flex;gap:8px;margin-top:16px">
+            <button class="btn" onclick="csvGoto(1)">Zurück</button>
+            <button class="btn primary" onclick="saveMapping()"><i class="ti ti-check"></i>Zuordnung speichern & importieren</button>
+          </div>
+        </div>
+
+        <!-- Schritt 3: Ergebnis -->
+        <div class="csv-step" id="csv3">
+          <div style="text-align:center;padding:30px 0">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+              <i class="ti ti-check" style="font-size:28px;color:var(--accent)"></i>
+            </div>
+            <div style="font-size:16px;font-weight:500;margin-bottom:6px">Import abgeschlossen</div>
+            <div id="importSummary" style="font-size:13px;color:var(--color-text-secondary)"></div>
+          </div>
+          <div id="importDetails" style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px;font-size:13px;margin-bottom:14px"></div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" style="flex:1" onclick="resetImport()">
+              <i class="ti ti-upload"></i>Weitere CSV importieren
+            </button>
+            <button class="btn primary" style="flex:1" onclick="showView('kunden');ladeKunden()">
+              <i class="ti ti-users"></i>Zur Kundenliste
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EINSTELLUNGEN ── -->
+    <div class="view" id="v-einstellungen">
+      <div style="max-width:640px">
+
+        <!-- Supabase Verbindung -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd"><h3>Supabase Verbindung</h3><span id="dbStatusBig" class="badge">–</span></div>
+          <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:14px">
+            URL und API-Key findest du in Supabase unter <strong>Settings → API</strong>.
+          </p>
+          <div class="form-group">
+            <label>Project URL</label>
+            <input type="text" id="cfgUrl" placeholder="https://xyzabcdef.supabase.co">
+          </div>
+          <div class="form-group">
+            <label>anon public Key</label>
+            <input type="text" id="cfgKey" placeholder="eyJ…">
+          </div>
+          <button class="btn primary" onclick="saveSupabaseConfig()"><i class="ti ti-plug"></i>Verbindung speichern & testen</button>
+        </div>
+
+        <!-- SQL Update Hinweis -->
+        <div class="card" style="margin-bottom:16px;border-color:#C0DD97">
+          <div class="card-hd"><h3>Datenbank erweitern</h3><span class="badge">Einmalig ausführen</span></div>
+          <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:12px">
+            Da neue Spalten hinzugekommen sind, muss die Datenbank einmalig erweitert werden.<br>
+            Dieses SQL im Supabase <strong>SQL Editor</strong> ausführen:
+          </p>
+          <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px;font-size:12px;font-family:'Courier New',monospace;color:#185FA5;line-height:1.7;overflow-x:auto;white-space:pre">alter table kunden
+  add column if not exists strasse text,
+  add column if not exists konditionsgruppe text,
+  add column if not exists listungsnummer text,
+  add column if not exists zahlungsbedingung text,
+  add column if not exists datum_letzte_lieferung date,
+  add column if not exists datum_letzter_kauf date;
+
+alter table ansprechpartner
+  add column if not exists anrede text,
+  add column if not exists vorname text,
+  add column if not exists zentrale text,
+  add column if not exists email_zentrale text;
+
+alter table umsatz_verlauf
+  add column if not exists umsatz_vj numeric(12,2),
+  add column if not exists ae_aj numeric(12,2),
+  add column if not exists ae_vj numeric(12,2),
+  add column if not exists ae_abweichung numeric(12,2),
+  add column if not exists ae_saison_fs_aj numeric(12,2),
+  add column if not exists ae_saison_fs_vj numeric(12,2),
+  add column if not exists ae_saison_hw_aj numeric(12,2),
+  add column if not exists ae_saison_hw_vj numeric(12,2),
+  add column if not exists auftragsbestand_aj numeric(12,2),
+  add column if not exists auftragsbestand_nj numeric(12,2),
+  add column if not exists wert_auslieferung numeric(12,2);
+
+create table if not exists gespraechsnotizen (
+  id          text primary key,
+  kunden_id   uuid references kunden(id) on delete cascade,
+  typ         text,
+  text        text,
+  erstellt_am timestamptz default now()
+);
+alter table gespraechsnotizen enable row level security;
+drop policy if exists "Anon Zugriff" on gespraechsnotizen;
+create policy "Anon Zugriff" on gespraechsnotizen for all using (true);</div>
+          <button class="btn" style="margin-top:10px;font-size:12px" onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent).then(()=>{this.textContent='✓ Kopiert';setTimeout(()=>this.textContent='SQL kopieren',2000)})">
+            <i class="ti ti-copy"></i>SQL kopieren
+          </button>
+        </div>
+
+        <!-- Branchen & Artikelgruppen -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd"><h3>Meine Branchen (CSV-Stammdaten)</h3></div>
+          <p style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:10px">Welche Branchen sind in deinem Portfolio – wird für Filter in der Kundenliste verwendet.</p>
+          <div class="tag-list" id="branchenTags">
+            <div class="tag active" onclick="this.classList.toggle('active')">Einzelhandel</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Großhandel</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Inneneinrichtung</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Floristik</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Online-Shop</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Hotel / Gastronomie</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Apotheke</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Bäckerei / Konditorei</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Buchhandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Baumarkt</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Lebensmittelhandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Modehandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Sporthandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Spielwarenhandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Elektrohandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Möbelhandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Sanitärhandel</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Einkaufszentrum</div>
+            <div class="tag" onclick="this.classList.toggle('active')">Sonstiges</div>
+          </div>
+          <div class="card-hd" style="margin-top:16px"><h3>Meine Artikelgruppen</h3></div>
+          <div class="tag-list" id="artgruppenTags">
+            <div class="tag active" onclick="this.classList.toggle('active')">Dekoartikel Saison</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Wohntextilien</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Geschenkartikel</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Outdoor & Garten</div>
+            <div class="tag active" onclick="this.classList.toggle('active')">Floristik</div>
+          </div>
+          <button class="btn" style="margin-top:10px;font-size:12px" onclick="addCustomTag('artgruppenTags')">
+            <i class="ti ti-plus"></i>Artikelgruppe hinzufügen
+          </button>
+        </div>
+
+        <!-- Länder & PLZ-Bereiche -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd"><h3>Länder & PLZ-Bereiche</h3></div>
+          <p style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:12px">
+            Immer 3 Zeichen – Ziffern oder <strong>x</strong> als Platzhalter für 0–9:<br>
+            <code style="background:var(--color-background-secondary);padding:1px 5px;border-radius:3px;font-size:12px">9xx</code> = alle PLZ 90000–99999 &nbsp;·&nbsp;
+            <code style="background:var(--color-background-secondary);padding:1px 5px;border-radius:3px;font-size:12px">94x</code> = alle PLZ 94000–94999 &nbsp;·&nbsp;
+            <code style="background:var(--color-background-secondary);padding:1px 5px;border-radius:3px;font-size:12px">904</code> = alle PLZ 90400–90499
+          </p>
+
+          <!-- Länderauswahl -->
+          <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Länder</div>
+          <div class="tag-list" id="laenderTags" style="margin-bottom:16px">
+            <div class="tag active" data-land="de" onclick="this.classList.toggle('active')">🇩🇪 Deutschland</div>
+            <div class="tag" data-land="at" onclick="this.classList.toggle('active')">🇦🇹 Österreich</div>
+            <div class="tag" data-land="ch" onclick="this.classList.toggle('active')">🇨🇭 Schweiz</div>
+            <div class="tag" data-land="lu" onclick="this.classList.toggle('active')">🇱🇺 Luxemburg</div>
+            <div class="tag" data-land="li" onclick="this.classList.toggle('active')">🇱🇮 Liechtenstein</div>
+          </div>
+
+          <!-- PLZ-Eingabe -->
+          <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">
+            PLZ-Bereiche <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--color-text-tertiary)">(immer 3 Zeichen, x = Wildcard)</span>
+          </div>
+          <div id="plzBereiche" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <div style="position:relative">
+              <input type="text" id="plzInput" maxlength="3" placeholder="9xx"
+                autocomplete="off" spellcheck="false"
+                oninput="formatPlzInput(this)"
+                onkeydown="if(event.key==='Enter')addPlzBereich()"
+                style="width:90px;font-size:16px;font-family:'Courier New',monospace;letter-spacing:3px;text-transform:lowercase;padding:7px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+              <div id="plzPreview" style="position:absolute;top:100%;left:0;font-size:11px;color:var(--color-text-tertiary);margin-top:3px;white-space:nowrap"></div>
+            </div>
+            <button class="btn primary" onclick="addPlzBereich()"><i class="ti ti-plus"></i>Hinzufügen</button>
+            <button class="btn" onclick="clearAllPlz()" style="font-size:12px;color:#A32D2D;border-color:#F4C2C2">Alle löschen</button>
+          </div>
+
+          <!-- PLZ-Schnellauswahl -->
+          <div style="margin-top:16px">
+            <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px">Schnellauswahl nach Region / Bundesland</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px" id="plzSchnell"></div>
+          </div>
+
+          <!-- Aktive Bereiche als Übersicht -->
+          <div style="margin-top:14px;padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:12px">
+            <div style="font-weight:500;color:var(--color-text-secondary);margin-bottom:4px">Routeneingrenzung aktiv für:</div>
+            <div id="plzRouteInfo" style="color:var(--color-text-tertiary)">Noch keine PLZ-Bereiche eingetragen – Routensuche ohne Eingrenzung</div>
+          </div>
+        </div>
+
+        <!-- Google Maps + Places Routensuche -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd"><h3>Google Maps Integration</h3><span class="badge" id="mapsStatus">Nicht verbunden</span></div>
+          <p style="font-size:13px;color:var(--color-text-secondary);margin-bottom:14px">
+            API-Key unter <strong>console.cloud.google.com</strong> → APIs &amp; Services → Credentials.<br>
+            Map ID unter <strong>console.cloud.google.com/google/maps-apis/studio/maps</strong> → „Karte erstellen".
+          </p>
+          <div class="form-group">
+            <label>Google Maps API-Key</label>
+            <input type="text" id="cfgMapsKey" placeholder="AIzaSy…">
+          </div>
+          <div class="form-group">
+            <label>Map ID <span style="font-size:11px;color:var(--color-text-tertiary);font-weight:400">(erforderlich für Marker – aus Maps Studio)</span></label>
+            <input type="text" id="cfgMapsId" placeholder="z.B. 8f348d1c3a5b2e9f">
+          </div>
+          <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px;font-size:12px;color:var(--color-text-tertiary);margin-bottom:12px">
+            <strong style="color:var(--color-text-secondary)">Map ID erstellen:</strong>
+            console.cloud.google.com → Google Maps Platform → Maps → „Karte erstellen" → Typ: Straßenkarte → ID kopieren
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn primary" onclick="saveMapsKey()"><i class="ti ti-map-pin"></i>Speichern & laden</button>
+            <button class="btn" onclick="testMapsKey()"><i class="ti ti-plug"></i>Verbindung testen</button>
+          </div>
+        </div>
+
+        <!-- Routensuche Branchen-Filter (Google Places Types) -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-hd"><h3>Routensuche – Google Places Branchen</h3></div>
+          <p style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:12px">
+            Diese Kategorien werden bei der automatischen Suche nach unbekannten Unternehmen auf der Route an Google Places übergeben.
+            Wähle alle Typen die für dein Vertriebsgebiet relevant sind.
+          </p>
+
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin:8px 0 6px">Einzelhandel & Fachhandel</div>
+          <div class="tag-list" id="placesTagsHandel">
+            <div class="tag active" data-type="store">store – Laden allgemein</div>
+            <div class="tag active" data-type="clothing_store">clothing_store – Bekleidung</div>
+            <div class="tag active" data-type="furniture_store">furniture_store – Möbel</div>
+            <div class="tag active" data-type="home_goods_store">home_goods_store – Haushaltswaren</div>
+            <div class="tag active" data-type="gift_shop">gift_shop – Geschenkartikel</div>
+            <div class="tag active" data-type="florist">florist – Floristik</div>
+            <div class="tag active" data-type="jewelry_store">jewelry_store – Schmuck</div>
+            <div class="tag" data-type="shoe_store">shoe_store – Schuhe</div>
+            <div class="tag" data-type="book_store">book_store – Buchhandel</div>
+            <div class="tag" data-type="toy_store">toy_store – Spielwaren</div>
+            <div class="tag" data-type="sporting_goods_store">sporting_goods_store – Sport</div>
+            <div class="tag" data-type="pet_store">pet_store – Tierhandel</div>
+            <div class="tag" data-type="bicycle_store">bicycle_store – Fahrrad</div>
+            <div class="tag" data-type="electronics_store">electronics_store – Elektronik</div>
+            <div class="tag" data-type="hardware_store">hardware_store – Baumarkt</div>
+            <div class="tag" data-type="department_store">department_store – Kaufhaus</div>
+            <div class="tag" data-type="shopping_mall">shopping_mall – Einkaufszentrum</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin:12px 0 6px">Lebensmittel & Spezialitäten</div>
+          <div class="tag-list" id="placesTagsFood">
+            <div class="tag" data-type="supermarket">supermarket – Supermarkt</div>
+            <div class="tag" data-type="grocery_or_supermarket">grocery_or_supermarket – Lebensmittel</div>
+            <div class="tag" data-type="bakery">bakery – Bäckerei</div>
+            <div class="tag" data-type="liquor_store">liquor_store – Getränke/Wein</div>
+            <div class="tag" data-type="convenience_store">convenience_store – Kiosk/Tante Emma</div>
+            <div class="tag" data-type="health_food_store">health_food_store – Reformhaus</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin:12px 0 6px">Gastronomie & Hotellerie</div>
+          <div class="tag-list" id="placesTagsGastro">
+            <div class="tag" data-type="restaurant">restaurant – Restaurant</div>
+            <div class="tag" data-type="cafe">cafe – Café</div>
+            <div class="tag" data-type="bar">bar – Bar</div>
+            <div class="tag" data-type="hotel">hotel – Hotel</div>
+            <div class="tag" data-type="lodging">lodging – Unterkunft</div>
+            <div class="tag" data-type="spa">spa – Wellness/Spa</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin:12px 0 6px">Gesundheit & Pflege</div>
+          <div class="tag-list" id="placesTagsHealth">
+            <div class="tag" data-type="pharmacy">pharmacy – Apotheke</div>
+            <div class="tag" data-type="drugstore">drugstore – Drogerie</div>
+            <div class="tag" data-type="beauty_salon">beauty_salon – Kosmetik/Beauty</div>
+            <div class="tag" data-type="hair_care">hair_care – Friseur</div>
+            <div class="tag" data-type="hospital">hospital – Klinik</div>
+            <div class="tag" data-type="doctor">doctor – Arztpraxis</div>
+            <div class="tag" data-type="dentist">dentist – Zahnarzt</div>
+            <div class="tag" data-type="veterinary_care">veterinary_care – Tierarzt</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.06em;color:var(--color-text-tertiary);margin:12px 0 6px">Dienstleistungen & Gewerbe</div>
+          <div class="tag-list" id="placesTagsService">
+            <div class="tag" data-type="laundry">laundry – Reinigung</div>
+            <div class="tag" data-type="car_dealer">car_dealer – Autohandel</div>
+            <div class="tag" data-type="car_repair">car_repair – KFZ-Werkstatt</div>
+            <div class="tag" data-type="car_wash">car_wash – Autowäsche</div>
+            <div class="tag" data-type="gas_station">gas_station – Tankstelle</div>
+            <div class="tag" data-type="moving_company">moving_company – Umzug</div>
+            <div class="tag" data-type="storage">storage – Lager/Self-Storage</div>
+            <div class="tag" data-type="electrician">electrician – Elektriker</div>
+            <div class="tag" data-type="plumber">plumber – Klempner</div>
+            <div class="tag" data-type="painter">painter – Maler</div>
+            <div class="tag" data-type="general_contractor">general_contractor – Baufirma</div>
+            <div class="tag" data-type="real_estate_agency">real_estate_agency – Immobilien</div>
+            <div class="tag" data-type="insurance_agency">insurance_agency – Versicherung</div>
+            <div class="tag" data-type="bank">bank – Bank</div>
+            <div class="tag" data-type="accounting">accounting – Steuerberater</div>
+            <div class="tag" data-type="lawyer">lawyer – Rechtsanwalt</div>
+            <div class="tag" data-type="travel_agency">travel_agency – Reisebüro</div>
+            <div class="tag" data-type="gym">gym – Fitnessstudio</div>
+            <div class="tag" data-type="school">school – Schule</div>
+            <div class="tag" data-type="university">university – Hochschule</div>
+            <div class="tag" data-type="library">library – Bibliothek</div>
+            <div class="tag" data-type="museum">museum – Museum</div>
+            <div class="tag" data-type="art_gallery">art_gallery – Galerie</div>
+            <div class="tag" data-type="church">church – Kirche/Gemeinde</div>
+            <div class="tag" data-type="funeral_home">funeral_home – Bestatter</div>
+            <div class="tag" data-type="cemetery">cemetery – Friedhof</div>
+          </div>
+
+          <div style="margin-top:14px;padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);font-size:12px;color:var(--color-text-tertiary)">
+            <i class="ti ti-info-circle" style="font-size:13px;vertical-align:-1px"></i>
+            Aktive Typen (grün) werden an Google Places übergeben. Maximal 5 gleichzeitig empfohlen für beste Ergebnisse.
+            <span id="activePlacesCount" style="color:var(--accent);font-weight:500;margin-left:4px"></span>
+          </div>
+
+          <button class="btn primary" style="margin-top:12px" onclick="savePlacesTypes()">
+            <i class="ti ti-device-floppy"></i>Routenfilter speichern
+          </button>
+        </div>
+
+        <button class="btn primary" onclick="saveEinstellungen()"><i class="ti ti-device-floppy"></i>Alle Einstellungen speichern</button>
+
+      </div>
+    </div>
+
+  </div><!-- .content -->
+</div><!-- #main -->
+
+<!-- ═══════════════════════════════════════════
+     DETAIL-PANEL (Overlay)
+═══════════════════════════════════════════ -->
+<div id="detailPanel">
+  <div class="back-btn" onclick="closeDetail()"><i class="ti ti-arrow-left"></i>Zurück zur Liste</div>
+  <div id="detailContent"></div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════
+     TERMIN-DIALOG (Modal) – vor dem Script!
+═══════════════════════════════════════════ -->
+<div id="terminModal" style="display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.35);align-items:center;justify-content:center">
+  <div style="background:var(--color-background-primary);border-radius:var(--border-radius-lg);padding:24px;width:460px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,0.18);position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h3 id="terminModalTitle" style="font-size:16px;font-weight:500">Termin anlegen</h3>
+      <button onclick="closeTerminDialog()" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--color-text-tertiary);line-height:1">×</button>
+    </div>
+
+    <div class="form-group">
+      <label>Kunde</label>
+      <!-- Beschreibbares Autofill-Feld mit Datalist -->
+      <div style="position:relative">
+        <input type="text" id="terminKundeInput" autocomplete="off"
+          placeholder="Firmenname eingeben oder suchen…"
+          oninput="filterTerminKunden(this.value)"
+          onfocus="showTerminDropdown()"
+          style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%">
+        <div id="terminKundenDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--color-background-primary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);z-index:200;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.12)"></div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Datum</label>
+      <input type="date" id="terminDatum" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label>Zeit von</label>
+        <input type="time" id="terminVon" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%">
+      </div>
+      <div class="form-group">
+        <label>Zeit bis</label>
+        <input type="time" id="terminBis" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Bemerkung</label>
+      <textarea id="terminBemerkung" placeholder="Gesprächspunkte, Mitnahme, Hinweise…" style="font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%;min-height:80px;resize:vertical;font-family:var(--font-sans)"></textarea>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button id="terminDeleteBtn" onclick="deleteTermin()" class="btn" style="color:#A32D2D;border-color:#F4C2C2;display:none"><i class="ti ti-trash"></i>Löschen</button>
+      <div style="flex:1"></div>
+      <button onclick="closeTerminDialog()" class="btn">Abbrechen</button>
+      <button onclick="saveTermin()" class="btn primary"><i class="ti ti-check"></i>Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// 1. SUPABASE KONFIGURATION
+//    ► URL und Key hier eintragen ODER
+//      in den Einstellungen speichern
+// ═══════════════════════════════════════════
+let SUPABASE_URL = localStorage.getItem('sb_url') || '';
+let SUPABASE_KEY = localStorage.getItem('sb_key') || '';
+let sb = null;
+
+function initSupabase(url, key) {
+  if (!url || !key) return false;
+  try {
+    sb = supabase.createClient(url, key);
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+async function testConnection() {
+  if (!sb) return false;
+  try {
+    const { error } = await sb.from('kunden').select('id').limit(1);
+    return !error;
+  } catch(e) { return false; }
+}
+
+async function checkAndSetStatus() {
+  const el  = document.getElementById('dbStatus');
+  const el2 = document.getElementById('dbStatusBig');
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    setStatus('⚠ Nicht verbunden', 'err');
+    return false;
+  }
+  initSupabase(SUPABASE_URL, SUPABASE_KEY);
+  const ok = await testConnection();
+  setStatus(ok ? '✓ Verbunden' : '✗ Fehler', ok ? 'ok' : 'err');
+  if (el2) el2.textContent = ok ? '✓ Verbunden' : '✗ Verbindung fehlgeschlagen';
+  return ok;
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById('dbStatus');
+  if (el) { el.textContent = text; el.className = cls; }
+}
+
+async function saveSupabaseConfig() {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if (!url || !key) { alert('Bitte URL und Key eingeben.'); return; }
+  localStorage.setItem('sb_url', url);
+  localStorage.setItem('sb_key', key);
+  SUPABASE_URL = url; SUPABASE_KEY = key;
+  const ok = await checkAndSetStatus();
+  if (ok) { alert('Verbindung erfolgreich! Kunden werden geladen.'); ladeKunden(); }
+  else alert('Verbindung fehlgeschlagen. Bitte URL und Key prüfen.');
+}
+
+// ═══════════════════════════════════════════
+// 2. DATEN LADEN
+// ═══════════════════════════════════════════
+let alleKunden = [];
+
+async function ladeKunden() {
+  if (!sb) {
+    // Demo-Daten wenn noch keine DB verbunden
+    alleKunden = demoKunden;
+    renderKundenTable(alleKunden);
+    updateDashboard();
+    fillSelects();
+    return;
+  }
+  try {
+    const { data, error } = await sb
+      .from('kunden')
+      .select('*, ansprechpartner(*), umsatz_verlauf(*)')
+      .order('firma');
+    if (error) throw error;
+    alleKunden = data;
+    renderKundenTable(alleKunden);
+    updateDashboard();
+    fillSelects();
+  } catch(e) {
+    console.error(e);
+    // Fallback auf Demo
+    alleKunden = demoKunden;
+    renderKundenTable(alleKunden);
+    updateDashboard();
+    fillSelects();
+  }
+}
+
+// ═══════════════════════════════════════════
+// 3. DEMO-DATEN (Fallback ohne DB)
+// ═══════════════════════════════════════════
+const demoKunden = [
+  { id:'1', kdnr:'K001', firma:'Deko Welt Nürnberg', ort:'Nürnberg', plz:'90402', branche:'Einzelhandel', artikelgruppe:'Dekoartikel Saison', status:'Aktiv', letzter_besuch:'2026-05-05',
+    ansprechpartner:[
+      { id:'a1', name:'Maria Schneider', funktion:'Einkauf', telefon:'+49 911 87654', mobil:'+49 170 1234567', email:'m.schneider@dekwelt-n.de', ist_haupt:true, notiz:'Bevorzugt Telefon morgens' },
+      { id:'a2', name:'Josef Kaufmann',  funktion:'Geschäftsführer', telefon:'+49 911 87655', mobil:'', email:'j.kaufmann@dekwelt-n.de', ist_haupt:false, notiz:'Nur bei größeren Themen' }
+    ],
+    umsatz_verlauf:[
+      {import_kw:'KW12',umsatz:2800},{import_kw:'KW13',umsatz:3100},{import_kw:'KW14',umsatz:2950},
+      {import_kw:'KW15',umsatz:3400},{import_kw:'KW16',umsatz:3800},{import_kw:'KW17',umsatz:3600},
+      {import_kw:'KW18',umsatz:4100},{import_kw:'KW19',umsatz:4200}
+    ]},
+  { id:'2', kdnr:'K002', firma:'Haus & Garten Erlangen', ort:'Erlangen', plz:'91054', branche:'Einzelhandel', artikelgruppe:'Outdoor & Garten', status:'Nachfassen', letzter_besuch:'2026-05-04',
+    ansprechpartner:[
+      { id:'a3', name:'Thomas Weber', funktion:'Inhaber', telefon:'+49 9131 12345', mobil:'+49 151 9876543', email:'t.weber@hausundgarten-er.de', ist_haupt:true, notiz:'Bevorzugt SMS/WhatsApp' }
+    ],
+    umsatz_verlauf:[
+      {import_kw:'KW15',umsatz:2100},{import_kw:'KW16',umsatz:2000},{import_kw:'KW17',umsatz:1980},{import_kw:'KW18',umsatz:1970},{import_kw:'KW19',umsatz:1850}
+    ]},
+  { id:'3', kdnr:'K003', firma:'Wohnideen Bamberg', ort:'Bamberg', plz:'96052', branche:'Inneneinrichtung', artikelgruppe:'Wohntextilien', status:'Aktiv', letzter_besuch:'2026-05-02',
+    ansprechpartner:[
+      { id:'a4', name:'Sabine Müller', funktion:'Einkäuferin', telefon:'+49 951 19988', mobil:'+49 172 5556677', email:'s.mueller@wohnideen-ba.de', ist_haupt:true, notiz:'' },
+      { id:'a5', name:'Robert Koch',   funktion:'Geschäftsführer', telefon:'+49 951 19900', mobil:'', email:'r.koch@wohnideen-ba.de', ist_haupt:false, notiz:'' }
+    ],
+    umsatz_verlauf:[
+      {import_kw:'KW16',umsatz:2800},{import_kw:'KW17',umsatz:2900},{import_kw:'KW18',umsatz:3000},{import_kw:'KW19',umsatz:3100}
+    ]},
+  { id:'4', kdnr:'K004', firma:'Blumen Atelier Regensburg', ort:'Regensburg', plz:'93047', branche:'Floristik', artikelgruppe:'Floristik', status:'Nachfassen', letzter_besuch:'2026-04-29',
+    ansprechpartner:[
+      { id:'a6', name:'Anna Richter', funktion:'Inhaberin', telefon:'+49 941 33456', mobil:'+49 160 7778899', email:'a.richter@blumen-atelier-r.de', ist_haupt:true, notiz:'Umsatz stark rückläufig' }
+    ],
+    umsatz_verlauf:[
+      {import_kw:'KW15',umsatz:1200},{import_kw:'KW16',umsatz:1100},{import_kw:'KW17',umsatz:950},{import_kw:'KW18',umsatz:820},{import_kw:'KW19',umsatz:780}
+    ]},
+  { id:'5', kdnr:'K005', firma:'Landhaus Stil Bayreuth', ort:'Bayreuth', plz:'95444', branche:'Einzelhandel', artikelgruppe:'Geschenkartikel', status:'Aktiv', letzter_besuch:'2026-04-22',
+    ansprechpartner:[
+      { id:'a7', name:'Peter Lang',  funktion:'Inhaber', telefon:'+49 921 44567', mobil:'+49 176 1122334', email:'p.lang@landhausstil-bt.de', ist_haupt:true, notiz:'' },
+      { id:'a8', name:'Monika Lang', funktion:'Geschäftsführung', telefon:'+49 921 44568', mobil:'', email:'m.lang@landhausstil-bt.de', ist_haupt:false, notiz:'' }
+    ],
+    umsatz_verlauf:[
+      {import_kw:'KW16',umsatz:2200},{import_kw:'KW17',umsatz:2350},{import_kw:'KW18',umsatz:2480},{import_kw:'KW19',umsatz:2560}
+    ]}
+];
+
+// ═══════════════════════════════════════════
+// 4. KUNDEN-TABELLE RENDERN
+// ═══════════════════════════════════════════
+function getAvatarColor(i) {
+  const colors=[['#EAF3DE','#3B6D11'],['#E6F1FB','#185FA5'],['#FAEEDA','#854F0B'],['#FBEAF0','#72243E'],['#EDE6FB','#4A2486']];
+  return colors[i % colors.length];
+}
+
+function getInitials(name) {
+  return name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+
+function letzterUmsatz(k) {
+  const v = k.umsatz_verlauf;
+  if (!v || v.length === 0) return null;
+  return v[v.length - 1].umsatz;
+}
+
+function umsatzTrend(k) {
+  const v = k.umsatz_verlauf;
+  if (!v || v.length < 2) return 0;
+  const a = v[v.length-2].umsatz;
+  const b = v[v.length-1].umsatz;
+  if (a === 0) return 0;
+  return Math.round((b - a) / a * 100);
+}
+
+function hauptAP(k) {
+  if (!k.ansprechpartner || k.ansprechpartner.length === 0) return null;
+  return k.ansprechpartner.find(a=>a.ist_haupt) || k.ansprechpartner[0];
+}
+
+function formatTel(tel) {
+  return tel ? tel.replace(/\s/g,'') : '';
+}
+
+function renderKundenTable(list) {
+  const body = document.getElementById('kundenBody');
+  if (!list || list.length === 0) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--color-text-tertiary)">Keine Kunden gefunden</td></tr>';
+    document.getElementById('view-badge').textContent = '0 Kunden';
+    return;
+  }
+  document.getElementById('view-badge').textContent = list.length + ' Kunden';
+  body.innerHTML = list.map(k => {
+    const ap = hauptAP(k);
+    const aps = k.ansprechpartner || [];
+    const umsatz = letzterUmsatz(k);
+    const trend = umsatzTrend(k);
+    const trendStr = trend === 0 ? '→ 0%' : (trend > 0 ? '↑ +'+trend+'%' : '↓ '+trend+'%');
+    const trendColor = trend > 0 ? '#639922' : trend < 0 ? '#A32D2D' : 'var(--color-text-tertiary)';
+    const apHtml = aps.slice(0,2).map((a,i) => {
+      const [bg,fg] = getAvatarColor(i);
+      return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <div style="width:22px;height:22px;border-radius:50%;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:500;flex-shrink:0">${getInitials(a.name)}</div>
+        <span style="font-size:12px">${a.name}</span>
+        ${a.ist_haupt ? '<span class="pill green" style="font-size:10px;padding:1px 5px">Haupt</span>' : ''}
+      </div>`;
+    }).join('') + (aps.length > 2 ? `<div style="font-size:11px;color:var(--color-text-tertiary);padding-left:28px">+${aps.length-2} weitere</div>` : '');
+    const kontaktHtml = ap ? `
+      <a href="tel:${formatTel(ap.telefon)}" class="btn call" style="padding:4px 8px;font-size:11px;text-decoration:none" onclick="event.stopPropagation()"><i class="ti ti-phone" style="font-size:12px"></i>${ap.name.split(' ')[0]}</a>
+      <a href="mailto:${ap.email}" class="btn mail" style="padding:4px 8px;font-size:11px;text-decoration:none" onclick="event.stopPropagation()"><i class="ti ti-mail" style="font-size:12px"></i>Mail</a>
+      ${ap.mobil ? `<a href="sms:${formatTel(ap.mobil)}" class="btn sms" style="padding:4px 8px;font-size:11px;text-decoration:none" onclick="event.stopPropagation()"><i class="ti ti-message" style="font-size:12px"></i>SMS</a>` : ''}
+    ` : '<span style="font-size:12px;color:var(--color-text-tertiary)">–</span>';
+    const datumStr = k.letzter_besuch ? new Date(k.letzter_besuch).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '–';
+    const brancheCls = k.branche==='Floristik'?'amber':k.branche==='Inneneinrichtung'?'blue':'green';
+    return `<tr onclick="openDetail('${k.id}')">
+      <td><strong>${k.firma}</strong><div style="font-size:11px;color:var(--color-text-tertiary)">${k.plz||''} ${k.ort||''}</div></td>
+      <td>${apHtml}</td>
+      <td><div style="display:flex;gap:4px;flex-wrap:wrap">${kontaktHtml}</div></td>
+      <td>${k.ort||'–'}<br><span class="pill ${brancheCls}" style="font-size:10px">${k.branche||'–'}</span></td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${datumStr}</td>
+      <td style="font-weight:500">${umsatz !== null ? '€'+Number(umsatz).toLocaleString('de-DE') : '–'}</td>
+      <td style="color:${trendColor}">${trendStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterKunden(q) {
+  const br = document.getElementById('filterBranche').value;
+  let list = alleKunden;
+  if (br) list = list.filter(k => k.branche === br);
+  if (q) {
+    const lq = q.toLowerCase();
+    list = list.filter(k =>
+      (k.firma||'').toLowerCase().includes(lq) ||
+      (k.ort||'').toLowerCase().includes(lq) ||
+      (k.ansprechpartner||[]).some(a => a.name.toLowerCase().includes(lq))
+    );
+  }
+  renderKundenTable(list);
+}
+
+function fillSelects() {
+  // Branchenfilter
+  const br = [...new Set(alleKunden.map(k=>k.branche).filter(Boolean))].sort();
+  const sel = document.getElementById('filterBranche');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Alle Branchen</option>' + br.map(b=>`<option value="${b}">${b}</option>`).join('');
+  sel.value = cur;
+
+  // Besuchsvorbereitung
+  const ps = document.getElementById('prepSelect');
+  const pv = ps.value;
+  ps.innerHTML = '<option value="">– Kunde wählen –</option>' + alleKunden.map(k=>`<option value="${k.id}">${k.firma}</option>`).join('');
+  if (pv) ps.value = pv;
+}
+
+// ═══════════════════════════════════════════
+// 5. DETAIL-PANEL
+// ═══════════════════════════════════════════
+function openDetail(id) {
+  const k = alleKunden.find(c => String(c.id) === String(id));
+  if (!k) return;
+  const aps = k.ansprechpartner || [];
+  const umsatz = letzterUmsatz(k);
+  const trend = umsatzTrend(k);
+  const trendStr = trend === 0 ? '→ 0%' : (trend > 0 ? '↑ +'+trend+'%' : '↓ '+trend+'%');
+  const trendColor = trend > 0 ? '#639922' : trend < 0 ? '#A32D2D' : 'var(--color-text-tertiary)';
+  const datumStr = k.letzter_besuch ? new Date(k.letzter_besuch).toLocaleDateString('de-DE') : '–';
+
+  const apCards = aps.map((a,i) => {
+    const [bg,fg] = getAvatarColor(i);
+    return `<div class="contact-card">
+      <div class="contact-header">
+        <div class="avatar-lg" style="background:${bg};color:${fg}">${getInitials(a.name)}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:500">${a.name}</div>
+          <div class="contact-role">${a.funktion||''}</div>
+          ${a.notiz ? `<div class="contact-meta">${a.notiz}</div>` : ''}
+        </div>
+        ${a.ist_haupt ? '<span class="pill green">Haupt-AP</span>' : ''}
+      </div>
+      ${a.telefon ? `<div class="info-row"><i class="ti ti-phone"></i><a href="tel:${formatTel(a.telefon)}">${a.telefon}</a><a href="tel:${formatTel(a.telefon)}" class="btn call action-link" style="padding:3px 10px;font-size:11px;text-decoration:none"><i class="ti ti-phone" style="font-size:12px"></i>Anrufen</a></div>` : ''}
+      ${a.mobil  ? `<div class="info-row"><i class="ti ti-device-mobile"></i><a href="tel:${formatTel(a.mobil)}">${a.mobil}</a><a href="sms:${formatTel(a.mobil)}" class="btn sms action-link" style="padding:3px 10px;font-size:11px;text-decoration:none"><i class="ti ti-message" style="font-size:12px"></i>SMS</a></div>` : ''}
+      ${a.email  ? `<div class="info-row"><i class="ti ti-mail"></i><a href="mailto:${a.email}">${a.email}</a><a href="mailto:${a.email}" class="btn mail action-link" style="padding:3px 10px;font-size:11px;text-decoration:none"><i class="ti ti-send" style="font-size:12px"></i>Mail</a></div>` : ''}
+      <div class="contact-actions">
+        ${a.telefon ? `<a href="tel:${formatTel(a.telefon)}" class="btn call" style="text-decoration:none"><i class="ti ti-phone"></i>Anrufen</a>` : ''}
+        ${a.email   ? `<a href="mailto:${a.email}" class="btn mail" style="text-decoration:none"><i class="ti ti-mail"></i>E-Mail schreiben</a>` : ''}
+        ${a.mobil   ? `<a href="sms:${formatTel(a.mobil)}" class="btn sms" style="text-decoration:none"><i class="ti ti-message"></i>SMS</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('detailContent').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="font-size:20px;font-weight:500;margin-bottom:6px">${k.firma}</h2>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--color-text-secondary)">${k.plz||''} ${k.ort||''} · ${k.branche||''}</span>
+          <span class="pill ${k.status==='Aktiv'?'green':'amber'}">${k.status||''}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="document.getElementById('prepSelect').value='${k.id}';showView('vorbereitung');loadPrep()"><i class="ti ti-clipboard-text"></i>Besuchsvorbereitung</button>
+        <button class="btn" style="color:#A32D2D;border-color:#F4C2C2" onclick="document.getElementById('prepSelect').value='${k.id}';exportPrepPdf('${k.id}')"><i class="ti ti-file-type-pdf"></i>PDF</button>
+        <button class="btn primary" onclick="openTerminDialog('','','${k.firma.replace(/'/g,"\\'")}')"><i class="ti ti-calendar-plus"></i>+ Termin</button>
+      </div>
+    </div>
+    <div class="grid2" style="margin-bottom:20px">
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px">
+        <div class="kpi-label">Umsatz aktuell</div>
+        <div class="kpi-val">${umsatz !== null ? '€'+Number(umsatz).toLocaleString('de-DE') : '–'}</div>
+        <div class="kpi-delta" style="color:${trendColor}">${trendStr}</div>
+      </div>
+      <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px">
+        <div class="kpi-label">Letzter Besuch</div>
+        <div class="kpi-val" style="font-size:18px">${datumStr}</div>
+        <div style="font-size:12px;color:var(--color-text-tertiary);margin-top:3px">${k.artikelgruppe||'–'}</div>
+      </div>
+    </div>
+    <div class="section-divider">Ansprechpartner (${aps.length})</div>
+    ${apCards || '<p style="font-size:13px;color:var(--color-text-tertiary)">Noch keine Ansprechpartner erfasst.</p>'}
+    <div style="display:flex;justify-content:flex-end;margin-top:8px">
+      <button class="btn"><i class="ti ti-plus"></i>Ansprechpartner hinzufügen</button>
+    </div>
+    <div class="section-divider">Umsatzverlauf</div>
+    <div style="position:relative;height:160px;margin-bottom:16px"><canvas id="detailChart"></canvas></div>
+
+    <div class="section-divider">Gesprächsnotizen</div>
+    <div id="notizList" style="margin-bottom:12px"></div>
+    <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:14px">
+      <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.06em">Neue Notiz</div>
+      <div class="form-group" style="margin-bottom:8px">
+        <select id="notizTyp" style="font-size:12px;padding:6px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);width:100%">
+          <option value="Besuch">🤝 Besuch</option>
+          <option value="Telefonat">📞 Telefonat</option>
+          <option value="E-Mail">✉ E-Mail</option>
+          <option value="Hinweis">💡 Hinweis</option>
+          <option value="Sonstiges">📝 Sonstiges</option>
+        </select>
+      </div>
+      <textarea id="notizText" placeholder="Gesprächsinhalt, wichtige Punkte, Vereinbarungen…"
+        style="width:100%;font-size:13px;padding:8px 10px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);font-family:var(--font-sans);resize:vertical;min-height:80px;margin-bottom:8px"></textarea>
+      <button class="btn primary" style="width:100%" onclick="speichereNotiz('${k.id}')">
+        <i class="ti ti-check"></i>Notiz speichern
+      </button>
+    </div>
+  `;
+  document.getElementById('detailPanel').classList.add('open');
+  renderNotizList(k.id);
+
+  // Verlauf-Chart
+  const v = k.umsatz_verlauf || [];
+  if (v.length > 1) {
+    const ctx = document.getElementById('detailChart');
+    if (ctx) new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: v.map(e=>e.import_kw||''),
+        datasets: [{ label:'Umsatz', data: v.map(e=>e.umsatz), borderColor:'#8FBF00', backgroundColor:'rgba(143,191,0,0.08)', tension:0.35, pointRadius:3, fill:true }]
+      },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v=>'€'+Number(v).toLocaleString('de-DE')}},x:{grid:{display:false}}} }
+    });
+  }
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════
+// 6. DASHBOARD
+// ═══════════════════════════════════════════
+let dashChartInst = null;
+
+function updateDashboard() {
+  document.getElementById('kpiKunden').textContent = alleKunden.length;
+  document.getElementById('kpiAP').textContent = alleKunden.reduce((s,k)=>s+(k.ansprechpartner||[]).length,0);
+  const nachfassen = alleKunden.filter(k=>k.status==='Nachfassen').length;
+  document.getElementById('kpiNachfassen').textContent = nachfassen;
+  const totalUmsatz = alleKunden.reduce((s,k)=>s+(letzterUmsatz(k)||0),0);
+  document.getElementById('kpiUmsatz').textContent = '€'+Math.round(totalUmsatz/1000)+'k';
+
+  // Aktivitäten
+  const sorted = [...alleKunden].sort((a,b)=>(b.letzter_besuch||'').localeCompare(a.letzter_besuch||'')).slice(0,5);
+  document.getElementById('dashAktivitaeten').innerHTML = sorted.map(k => {
+    const ap = hauptAP(k);
+    const u = letzterUmsatz(k);
+    const t = umsatzTrend(k);
+    return `<tr onclick="openDetail('${k.id}')">
+      <td><strong>${k.firma}</strong></td>
+      <td>${ap ? ap.name : '–'}</td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${k.letzter_besuch ? new Date(k.letzter_besuch).toLocaleDateString('de-DE') : '–'}</td>
+      <td style="font-weight:500">${u !== null ? '€'+Number(u).toLocaleString('de-DE') : '–'}</td>
+      <td><span class="pill ${k.status==='Aktiv'?'green':'amber'}">${k.status||''}</span></td>
+    </tr>`;
+  }).join('');
+
+  // Artikelgruppen
+  const ag = {};
+  alleKunden.forEach(k => { if(k.artikelgruppe) ag[k.artikelgruppe] = (ag[k.artikelgruppe]||0)+1; });
+  const max = Math.max(...Object.values(ag), 1);
+  document.getElementById('artGruppenStats').innerHTML = Object.entries(ag).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([g,n])=>
+    `<div class="stat-row"><span>${g}</span><div class="prog-bar"><div class="prog-fill" style="width:${Math.round(n/max*100)}%"></div></div><span style="font-size:12px;color:var(--color-text-secondary)">${n}</span></div>`
+  ).join('');
+
+  // Umsatz-Chart
+  const kwMap = {};
+  alleKunden.forEach(k => (k.umsatz_verlauf||[]).forEach(v => { kwMap[v.import_kw] = (kwMap[v.import_kw]||0) + Number(v.umsatz||0); }));
+  const kwKeys = Object.keys(kwMap).slice(-8);
+  const ctx = document.getElementById('dashChart');
+  if (ctx) {
+    if (dashChartInst) dashChartInst.destroy();
+    dashChartInst = new Chart(ctx, {
+      type:'bar',
+      data:{ labels:kwKeys, datasets:[{ label:'Umsatz', data:kwKeys.map(k=>kwMap[k]||0), backgroundColor:'rgba(143,191,0,0.7)', borderRadius:3 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{ticks:{callback:v=>'€'+Math.round(v/1000)+'k'}},x:{grid:{display:false}}} }
+    });
+  }
+}
+
+// Route
+// ═══════════════════════════════════════════
+// GESPRÄCHSNOTIZEN
+// ═══════════════════════════════════════════
+
+// Notizen aus localStorage laden + alte (>2 Jahre) automatisch löschen
+function ladeNotizen(kundeId) {
+  const alle = JSON.parse(localStorage.getItem('fieldcrm_notizen') || '{}');
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 2);
+  const notizen = (alle[kundeId] || []).filter(n => new Date(n.ts) > cutoff);
+  // Bereinigt zurückspeichern
+  alle[kundeId] = notizen;
+  localStorage.setItem('fieldcrm_notizen', JSON.stringify(alle));
+  return notizen;
+}
+
+function speichereNotizLokal(kundeId, notiz) {
+  const alle = JSON.parse(localStorage.getItem('fieldcrm_notizen') || '{}');
+  if (!alle[kundeId]) alle[kundeId] = [];
+  alle[kundeId].unshift(notiz); // neueste zuerst
+  localStorage.setItem('fieldcrm_notizen', JSON.stringify(alle));
+}
+
+function loescheNotizLokal(kundeId, notizId) {
+  const alle = JSON.parse(localStorage.getItem('fieldcrm_notizen') || '{}');
+  alle[kundeId] = (alle[kundeId] || []).filter(n => n.id !== notizId);
+  localStorage.setItem('fieldcrm_notizen', JSON.stringify(alle));
+}
+
+function renderNotizList(kundeId) {
+  const el = document.getElementById('notizList');
+  if (!el) return;
+  const notizen = ladeNotizen(kundeId);
+
+  if (!notizen.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:8px 0">Noch keine Notizen vorhanden</div>';
+    return;
+  }
+
+  const typIcons = { Besuch:'🤝', Telefonat:'📞', 'E-Mail':'✉', Hinweis:'💡', Sonstiges:'📝' };
+  const typColors = { Besuch:'#EAF3DE', Telefonat:'#E6F1FB', 'E-Mail':'#EDE6FB', Hinweis:'#FAEEDA', Sonstiges:'#F1EFE8' };
+  const typBorder = { Besuch:'#8FBF00', Telefonat:'#378ADD', 'E-Mail':'#7B5EA7', Hinweis:'#EF9F27', Sonstiges:'#CFCDC4' };
+
+  el.innerHTML = notizen.map(n => {
+    const ts = new Date(n.ts);
+    const alter = Math.floor((new Date() - ts) / 86400000);
+    const alterStr = alter === 0 ? 'Heute' : alter === 1 ? 'Gestern' : alter < 30 ? `vor ${alter} Tagen` : ts.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit', year:'numeric'});
+    const icon  = typIcons[n.typ]  || '📝';
+    const bg    = typColors[n.typ] || '#F1EFE8';
+    const border= typBorder[n.typ] || '#CFCDC4';
+    return `
+    <div style="padding:12px 14px;background:${bg};border-left:3px solid ${border};border-radius:var(--border-radius-md);margin-bottom:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">${icon}</span>
+          <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">${n.typ}</span>
+          <span style="font-size:11px;color:var(--color-text-tertiary)">· ${alterStr}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;color:var(--color-text-tertiary)">${ts.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})} ${ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</span>
+          <button onclick="loescheNotiz('${kundeId}','${n.id}')" style="background:none;border:none;cursor:pointer;color:var(--color-text-tertiary);font-size:14px;line-height:1;padding:0" title="Notiz löschen">×</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--color-text-primary);line-height:1.5;white-space:pre-wrap">${n.text}</div>
+    </div>`;
+  }).join('');
+}
+
+async function speichereNotiz(kundeId) {
+  const text = document.getElementById('notizText')?.value?.trim();
+  const typ  = document.getElementById('notizTyp')?.value || 'Sonstiges';
+  if (!text) { alert('Bitte Notiztext eingeben.'); return; }
+
+  const notiz = {
+    id:   'N' + Date.now(),
+    ts:   new Date().toISOString(),
+    typ,
+    text,
+    kundeId,
+  };
+
+  // Lokal speichern
+  speichereNotizLokal(kundeId, notiz);
+
+  // In Supabase speichern falls verbunden
+  if (sb) {
+    try {
+      await sb.from('gespraechsnotizen').insert({
+        id:        notiz.id,
+        kunden_id: kundeId,
+        typ:       notiz.typ,
+        text:      notiz.text,
+        erstellt_am: notiz.ts,
+      });
+    } catch(e) { /* lokal gespeichert reicht als Fallback */ }
+  }
+
+  // Eingabe leeren und Liste neu rendern
+  document.getElementById('notizText').value = '';
+  renderNotizList(kundeId);
+
+  // Button-Feedback
+  const btn = document.querySelector(`button[onclick="speichereNotiz('${kundeId}')"]`);
+  if (btn) {
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="ti ti-check"></i>Gespeichert';
+    btn.style.background = '#639922';
+    setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 1500);
+  }
+}
+
+function loescheNotiz(kundeId, notizId) {
+  if (!confirm('Notiz löschen?')) return;
+  loescheNotizLokal(kundeId, notizId);
+  if (sb) {
+    sb.from('gespraechsnotizen').delete().eq('id', notizId).then(() => {});
+  }
+  renderNotizList(kundeId);
+}
+
+// Notizen für Besuchsvorbereitung laden
+function ladeNotizenFuerPrep(kundeId) {
+  return ladeNotizen(kundeId).slice(0, 10); // max. 10 neueste für PDF/Prep
+}
+
+// ═══════════════════════════════════════════
+// 7. BESUCHSVORBEREITUNG
+// ═══════════════════════════════════════════
+let prepCharts = {};
+
+function fmt(val, prefix='€') {
+  if (val === null || val === undefined || val === '') return '–';
+  const n = Number(val);
+  if (isNaN(n)) return '–';
+  return prefix + n.toLocaleString('de-DE', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+function fmtPct(val) {
+  if (val === null || val === undefined || val === '') return '–';
+  const n = Number(val);
+  if (isNaN(n)) return '–';
+  return (n >= 0 ? '+' : '') + n.toLocaleString('de-DE', {minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+}
+
+function deltaColor(val) {
+  const n = Number(val);
+  if (isNaN(n) || n === 0) return 'var(--color-text-tertiary)';
+  return n > 0 ? '#639922' : '#A32D2D';
+}
+
+function deltaArrow(val) {
+  const n = Number(val);
+  if (isNaN(n) || n === 0) return '→';
+  return n > 0 ? '↑' : '↓';
+}
+
+function kpiCard(label, val, sub='', subColor='') {
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-val" style="font-size:18px">${val}</div>
+    ${sub ? `<div class="kpi-delta" style="color:${subColor||'var(--color-text-tertiary)'}">${sub}</div>` : ''}
+  </div>`;
+}
+
+function loadPrep() {
+  const id = document.getElementById('prepSelect').value;
+  const k = alleKunden.find(c => String(c.id) === String(id));
+  const el = document.getElementById('prepContent');
+  if (!k) {
+    el.innerHTML = '<p style="color:var(--color-text-tertiary);font-size:13px">Bitte Kunde auswählen.</p>';
+    const btn = document.getElementById('prepPdfBtn');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  // PDF-Button einblenden
+  const pdfBtn = document.getElementById('prepPdfBtn');
+  if (pdfBtn) pdfBtn.style.display = 'flex';
+
+  // Destroy old charts
+  Object.values(prepCharts).forEach(c => { try { c.destroy(); } catch(e){} });
+  prepCharts = {};
+
+  const aps  = k.ansprechpartner || [];
+  const v    = k.umsatz_verlauf  || [];
+  // Neueste Kennzahlen aus letztem Import-Eintrag
+  const last = v.length ? v[v.length-1] : {};
+  const u_aj  = last.umsatz       ?? null;
+  const u_vj  = last.umsatz_vj    ?? null;
+  const ae_aj = last.ae_aj        ?? null;
+  const ae_vj = last.ae_vj        ?? null;
+  const ae_abw= last.ae_abweichung?? null;
+  const fs_aj = last.ae_saison_fs_aj ?? null;
+  const fs_vj = last.ae_saison_fs_vj ?? null;
+  const hw_aj = last.ae_saison_hw_aj ?? null;
+  const hw_vj = last.ae_saison_hw_vj ?? null;
+  const ab_aj = last.auftragsbestand_aj ?? null;
+  const ab_nj = last.auftragsbestand_nj ?? null;
+  const wert  = last.wert_auslieferung  ?? null;
+
+  // Trend Umsatz AJ vs VJ
+  const uTrend = (u_aj !== null && u_vj !== null && u_vj !== 0)
+    ? ((u_aj - u_vj) / u_vj * 100).toFixed(1) : null;
+  const aeTrend = (ae_aj !== null && ae_vj !== null && ae_vj !== 0)
+    ? ((ae_aj - ae_vj) / ae_vj * 100).toFixed(1) : null;
+
+  document.getElementById('prepStatus').innerHTML =
+    `<span class="pill ${k.status==='Aktiv'?'green':'amber'}">${k.status||''}</span>
+     <span style="font-size:12px;color:var(--color-text-tertiary);margin-left:6px">${k.konditionsgruppe ? 'Kond.: '+k.konditionsgruppe : ''}</span>
+     <span style="font-size:12px;color:var(--color-text-tertiary);margin-left:6px">${k.zahlungsbedingung ? 'Zahlung: '+k.zahlungsbedingung : ''}</span>`;
+
+  el.innerHTML = `
+
+    <!-- ── Stamm-KPIs ── -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      ${kpiCard('Umsatz AJ', fmt(u_aj),
+        uTrend !== null ? deltaArrow(uTrend)+' '+fmtPct(uTrend)+' vs. VJ' : (u_vj !== null ? 'VJ: '+fmt(u_vj) : ''),
+        uTrend !== null ? deltaColor(uTrend) : '')}
+      ${kpiCard('Umsatz VJ', fmt(u_vj))}
+      ${kpiCard('AE AJ', fmt(ae_aj),
+        aeTrend !== null ? deltaArrow(aeTrend)+' '+fmtPct(aeTrend)+' vs. VJ' : '',
+        aeTrend !== null ? deltaColor(aeTrend) : '')}
+      ${kpiCard('AE Abweichung', ae_abw !== null ? fmtPct(ae_abw) : '–', '', deltaColor(ae_abw))}
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-top:-8px">
+      ${kpiCard('AE Saison FS (AJ)', fmt(fs_aj), fs_vj !== null ? 'VJ: '+fmt(fs_vj) : '')}
+      ${kpiCard('AE Saison HW (AJ)', fmt(hw_aj), hw_vj !== null ? 'VJ: '+fmt(hw_vj) : '')}
+      ${kpiCard('Auftragsbestand AJ', fmt(ab_aj), ab_nj !== null ? 'NJ: '+fmt(ab_nj) : '')}
+      ${kpiCard('Wert in Auslieferung', fmt(wert))}
+    </div>
+
+    <!-- ── Diagramme ── -->
+    <div class="grid2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-hd"><h3>Umsatz AJ vs. VJ – Verlauf</h3></div>
+        <div style="position:relative;height:180px"><canvas id="chartUmsatz"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><h3>Auftragseingang AJ vs. VJ</h3></div>
+        <div style="position:relative;height:180px"><canvas id="chartAE"></canvas></div>
+      </div>
+    </div>
+    <div class="grid2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-hd"><h3>Saison FS &amp; HW – AJ vs. VJ</h3></div>
+        <div style="position:relative;height:180px"><canvas id="chartSaison"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><h3>Auftragsbestand AJ / NJ + Auslieferung</h3></div>
+        <div style="position:relative;height:180px"><canvas id="chartAB"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ── Ansprechpartner ── -->
+    <div class="section-divider">Ansprechpartner (${aps.length})</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:16px">
+      ${aps.map((a,i)=>{
+        const [bg,fg]=getAvatarColor(i);
+        return `<div class="contact-card" style="margin-bottom:0">
+          <div class="contact-header">
+            <div class="avatar-lg" style="background:${bg};color:${fg}">${getInitials(a.name)}</div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:500">${a.anrede?a.anrede+' ':''}${a.name}</div>
+              <div class="contact-role">${a.funktion||''}</div>
+              ${a.notiz?`<div class="contact-meta">${a.notiz}</div>`:''}
+            </div>
+          </div>
+          ${a.telefon?`<div class="info-row"><i class="ti ti-phone"></i><a href="tel:${formatTel(a.telefon)}">${a.telefon}</a><a href="tel:${formatTel(a.telefon)}" class="btn call action-link" style="padding:3px 9px;font-size:11px;text-decoration:none"><i class="ti ti-phone" style="font-size:11px"></i>Anrufen</a></div>`:''}
+          ${a.zentrale?`<div class="info-row"><i class="ti ti-building"></i><a href="tel:${formatTel(a.zentrale)}">${a.zentrale}</a><a href="tel:${formatTel(a.zentrale)}" class="btn call action-link" style="padding:3px 9px;font-size:11px;text-decoration:none"><i class="ti ti-phone" style="font-size:11px"></i>Zentrale</a></div>`:''}
+          ${a.mobil?`<div class="info-row"><i class="ti ti-device-mobile"></i><a href="tel:${formatTel(a.mobil)}">${a.mobil}</a><a href="sms:${formatTel(a.mobil)}" class="btn sms action-link" style="padding:3px 9px;font-size:11px;text-decoration:none"><i class="ti ti-message" style="font-size:11px"></i>SMS</a></div>`:''}
+          ${a.email?`<div class="info-row"><i class="ti ti-mail"></i><a href="mailto:${a.email}">${a.email}</a><a href="mailto:${a.email}" class="btn mail action-link" style="padding:3px 9px;font-size:11px;text-decoration:none"><i class="ti ti-send" style="font-size:11px"></i>Mail</a></div>`:''}
+          ${a.email_zentrale?`<div class="info-row"><i class="ti ti-mail"></i><a href="mailto:${a.email_zentrale}">${a.email_zentrale}</a><a href="mailto:${a.email_zentrale}" class="btn mail action-link" style="padding:3px 9px;font-size:11px;text-decoration:none"><i class="ti ti-send" style="font-size:11px"></i>Zentrale</a></div>`:''}
+          <div class="contact-actions">
+            ${a.telefon?`<a href="tel:${formatTel(a.telefon)}" class="btn call" style="text-decoration:none"><i class="ti ti-phone"></i>Anrufen</a>`:''}
+            ${a.email?`<a href="mailto:${a.email}" class="btn mail" style="text-decoration:none"><i class="ti ti-mail"></i>E-Mail</a>`:''}
+            ${a.mobil?`<a href="sms:${formatTel(a.mobil)}" class="btn sms" style="text-decoration:none"><i class="ti ti-message"></i>SMS</a>`:''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- ── Gesprächsnotizen ── -->
+    ${(() => {
+      const notizen = ladeNotizenFuerPrep(k.id);
+      if (!notizen.length) return '';
+      const typIcons = { Besuch:'🤝', Telefonat:'📞', 'E-Mail':'✉', Hinweis:'💡', Sonstiges:'📝' };
+      const typBorder = { Besuch:'#8FBF00', Telefonat:'#378ADD', 'E-Mail':'#7B5EA7', Hinweis:'#EF9F27', Sonstiges:'#CFCDC4' };
+      return `<div class="section-divider">Gesprächsnotizen (${notizen.length})</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        ${notizen.map(n => {
+          const ts = new Date(n.ts);
+          const border = typBorder[n.typ] || '#CFCDC4';
+          return `<div style="padding:10px 14px;background:var(--color-background-secondary);border-left:3px solid ${border};border-radius:var(--border-radius-md)">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+              <span style="font-size:13px">${typIcons[n.typ]||'📝'}</span>
+              <span style="font-size:12px;font-weight:600;color:var(--color-text-secondary)">${n.typ}</span>
+              <span style="font-size:11px;color:var(--color-text-tertiary)">· ${ts.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})} ${ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}</span>
+            </div>
+            <div style="font-size:13px;color:var(--color-text-primary);line-height:1.5;white-space:pre-wrap">${n.text}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    })()}
+
+    <!-- ── Notizen ── -->
+    <div class="card">
+      <div class="card-hd"><h3>Besuchsvorbereitung &amp; Notizen</h3></div>
+      <div class="grid2">
+        <div>
+          <div class="form-group"><label>Besuchsziel</label>
+            <select id="prepZiel"><option>Neuheitenpräsentation</option><option>Jahresgespräch</option><option>Problemlösung</option><option>Routinebesuch</option><option>Konditionsgespräch</option></select>
+          </div>
+          <div class="form-group"><label>Mitnahme / Vorbereitung</label>
+            <textarea id="prepMitnahme" placeholder="Musterkoffer, Konditionenblatt, Katalog…"></textarea>
+          </div>
+        </div>
+        <div>
+          <div class="form-group"><label>Gesprächspunkte</label>
+            <textarea id="prepGespraechspunkte" placeholder="Offene Punkte, Themen, Chancen…" style="min-height:80px"></textarea>
+          </div>
+          <div class="form-group"><label>Interne Notiz <span style="font-size:10px;color:var(--color-text-tertiary)">(wird nicht in PDF exportiert)</span></label>
+            <textarea id="prepInterneNotiz" placeholder="Nur für dich sichtbar…"></textarea>
+          </div>
+          <button class="btn primary" style="width:100%"><i class="ti ti-check"></i>Vorbereitung speichern</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Alle Diagramme nach DOM-Render aufbauen
+  setTimeout(() => buildPrepCharts(v, u_aj, u_vj, ae_aj, ae_vj, fs_aj, fs_vj, hw_aj, hw_vj, ab_aj, ab_nj, wert), 60);
+}
+
+function buildPrepCharts(v, u_aj, u_vj, ae_aj, ae_vj, fs_aj, fs_vj, hw_aj, hw_vj, ab_aj, ab_nj, wert) {
+  const labels = v.map(e => e.import_kw || '');
+  const gridColor = 'rgba(0,0,0,0.05)';
+  const fmtY = val => '€' + Number(val).toLocaleString('de-DE');
+
+  // 1. Umsatz AJ vs VJ Verlauf
+  const c1 = document.getElementById('chartUmsatz');
+  if (c1 && v.length) {
+    prepCharts.umsatz = new Chart(c1, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label:'Umsatz AJ', data: v.map(e=>e.umsatz??null),    borderColor:'#8FBF00', backgroundColor:'rgba(143,191,0,0.08)', tension:0.35, pointRadius:3, fill:true },
+          { label:'Umsatz VJ', data: v.map(e=>e.umsatz_vj??null), borderColor:'#CFCDC4', backgroundColor:'transparent',           tension:0.35, pointRadius:2, borderDash:[4,3] }
+        ]
+      },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+        scales:{ y:{ ticks:{ callback:fmtY, font:{size:10} }, grid:{color:gridColor} }, x:{ grid:{display:false}, ticks:{font:{size:10}} } }
+      }
+    });
+  }
+
+  // 2. Auftragseingang AJ vs VJ
+  const c2 = document.getElementById('chartAE');
+  if (c2 && v.length) {
+    prepCharts.ae = new Chart(c2, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label:'AE AJ', data: v.map(e=>e.ae_aj??null), backgroundColor:'rgba(143,191,0,0.7)', borderRadius:3 },
+          { label:'AE VJ', data: v.map(e=>e.ae_vj??null), backgroundColor:'rgba(207,205,196,0.5)', borderRadius:3 }
+        ]
+      },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+        scales:{ y:{ ticks:{ callback:fmtY, font:{size:10} }, grid:{color:gridColor} }, x:{ grid:{display:false}, ticks:{font:{size:10}} } }
+      }
+    });
+  }
+
+  // 3. Saison FS & HW – grouped bar AJ vs VJ
+  const c3 = document.getElementById('chartSaison');
+  if (c3) {
+    const hasData = [fs_aj,fs_vj,hw_aj,hw_vj].some(x=>x!==null);
+    if (hasData) {
+      prepCharts.saison = new Chart(c3, {
+        type: 'bar',
+        data: {
+          labels: ['Saison FS', 'Saison HW'],
+          datasets: [
+            { label:'AJ', data:[fs_aj??0, hw_aj??0], backgroundColor:'rgba(143,191,0,0.75)', borderRadius:4 },
+            { label:'VJ', data:[fs_vj??0, hw_vj??0], backgroundColor:'rgba(207,205,196,0.55)', borderRadius:4 }
+          ]
+        },
+        options: { responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ labels:{ font:{size:11}, boxWidth:12 } } },
+          scales:{ y:{ ticks:{ callback:fmtY, font:{size:10} }, grid:{color:gridColor} }, x:{ grid:{display:false}, ticks:{font:{size:11}} } }
+        }
+      });
+    } else {
+      c3.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--color-text-tertiary)">Keine Saison-Daten vorhanden</div>';
+    }
+  }
+
+  // 4. Auftragsbestand AJ/NJ + Wert Auslieferung
+  const c4 = document.getElementById('chartAB');
+  if (c4) {
+    const hasData = [ab_aj,ab_nj,wert].some(x=>x!==null);
+    if (hasData) {
+      prepCharts.ab = new Chart(c4, {
+        type: 'bar',
+        data: {
+          labels: ['Auftragsbestand AJ', 'Auftragsbestand NJ', 'Wert Auslieferung'],
+          datasets: [{
+            data: [ab_aj??0, ab_nj??0, wert??0],
+            backgroundColor: ['rgba(143,191,0,0.75)','rgba(55,138,221,0.6)','rgba(239,159,39,0.65)'],
+            borderRadius: 4
+          }]
+        },
+        options: { responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{ display:false } },
+          scales:{ y:{ ticks:{ callback:fmtY, font:{size:10} }, grid:{color:gridColor} }, x:{ grid:{display:false}, ticks:{font:{size:10}} } }
+        }
+      });
+    } else {
+      c4.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:var(--color-text-tertiary)">Keine Auftragsbestand-Daten vorhanden</div>';
+    }
+  }
+}
+
+function openNeuKunde() {
+  document.getElementById('detailContent').innerHTML = `
+    <h2 style="font-size:18px;font-weight:500;margin-bottom:20px">Neuer Kunde</h2>
+    <div class="grid2">
+      <div class="form-group"><label>Kundennummer</label><input type="text" id="nk_kdnr" placeholder="K001"></div>
+      <div class="form-group"><label>Firma *</label><input type="text" id="nk_firma" placeholder="Firmenname"></div>
+      <div class="form-group"><label>PLZ</label><input type="text" id="nk_plz" placeholder="90402"></div>
+      <div class="form-group"><label>Ort</label><input type="text" id="nk_ort" placeholder="Nürnberg"></div>
+      <div class="form-group"><label>Branche</label><input type="text" id="nk_branche" placeholder="Einzelhandel"></div>
+      <div class="form-group"><label>Artikelgruppe</label><input type="text" id="nk_artgrp" placeholder="Dekoartikel Saison"></div>
+    </div>
+    <div class="section-divider">Ansprechpartner</div>
+    <div class="grid2">
+      <div class="form-group"><label>Name</label><input type="text" id="nk_apname" placeholder="Vor- und Nachname"></div>
+      <div class="form-group"><label>Funktion</label><input type="text" id="nk_apfunk" placeholder="Einkauf"></div>
+      <div class="form-group"><label>Telefon</label><input type="tel" id="nk_aptel" placeholder="+49 911 12345"></div>
+      <div class="form-group"><label>Mobil</label><input type="tel" id="nk_apmob" placeholder="+49 170 1234567"></div>
+      <div class="form-group"><label>E-Mail</label><input type="email" id="nk_apmail" placeholder="name@firma.de"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" onclick="closeDetail()">Abbrechen</button>
+      <button class="btn primary" onclick="saveNeuKunde()"><i class="ti ti-check"></i>Kunde speichern</button>
+    </div>
+  `;
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+async function saveNeuKunde() {
+  const firma = document.getElementById('nk_firma').value.trim();
+  if (!firma) { alert('Firmenname ist Pflichtfeld.'); return; }
+  const neuerKunde = {
+    id: 'neu_'+Date.now(),
+    kdnr: document.getElementById('nk_kdnr').value.trim(),
+    firma,
+    plz: document.getElementById('nk_plz').value.trim(),
+    ort: document.getElementById('nk_ort').value.trim(),
+    branche: document.getElementById('nk_branche').value.trim(),
+    artikelgruppe: document.getElementById('nk_artgrp').value.trim(),
+    status: 'Aktiv',
+    letzter_besuch: null,
+    ansprechpartner: [],
+    umsatz_verlauf: []
+  };
+  const apName = document.getElementById('nk_apname').value.trim();
+  if (apName) {
+    neuerKunde.ansprechpartner.push({
+      id: 'ap_'+Date.now(),
+      name: apName,
+      funktion: document.getElementById('nk_apfunk').value.trim(),
+      telefon:  document.getElementById('nk_aptel').value.trim(),
+      mobil:    document.getElementById('nk_apmob').value.trim(),
+      email:    document.getElementById('nk_apmail').value.trim(),
+      ist_haupt: true
+    });
+  }
+  if (sb) {
+    // In Supabase speichern
+    const { data, error } = await sb.from('kunden').insert({ ...neuerKunde, ansprechpartner: undefined, umsatz_verlauf: undefined }).select().single();
+    if (!error && data && apName) {
+      await sb.from('ansprechpartner').insert({ ...neuerKunde.ansprechpartner[0], kunden_id: data.id, id: undefined });
+    }
+  }
+  alleKunden.unshift(neuerKunde);
+  renderKundenTable(alleKunden);
+  fillSelects();
+  closeDetail();
+}
+
+// ═══════════════════════════════════════════
+// 8. KALENDER & TERMIN-VERWALTUNG
+// ═══════════════════════════════════════════
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let termine = JSON.parse(localStorage.getItem('fieldcrm_termine') || '[]');
+let editTerminId = null;
+let calSelectedDay = null;
+
+function saveTermineLocal() {
+  localStorage.setItem('fieldcrm_termine', JSON.stringify(termine));
+}
+
+// Termine eines Tages (YYYY-MM-DD)
+function termineAmTag(dateStr) {
+  return termine.filter(t => t.datum === dateStr).sort((a,b) => (a.von||'').localeCompare(b.von||''));
+}
+
+function buildCalendar() {
+  const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  document.getElementById('calTitle').textContent = monthNames[calMonth] + ' ' + calYear;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0,10);
+
+  for (let i=0;i<offset;i++) {
+    const d=document.createElement('div'); d.className='cal-day'; d.style.opacity='0.15'; grid.appendChild(d);
+  }
+  for (let d=1; d<=daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const tage = termineAmTag(dateStr);
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    if (dateStr === todayStr) el.classList.add('today');
+    if (tage.length > 0) el.classList.add('has-visit');
+    if (dateStr === calSelectedDay) el.style.outline = '2px solid var(--accent)';
+    el.innerHTML = `<div class="day-num">${d}</div>` +
+      tage.slice(0,2).map(t =>
+        `<div style="font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--accent);margin-top:1px">
+          ${t.von?t.von+' ':''}<span style="color:var(--color-text-primary)">${t.kunde||t.bemerkung||'Termin'}</span>
+        </div>`
+      ).join('') +
+      (tage.length > 2 ? `<div style="font-size:9px;color:var(--color-text-tertiary)">+${tage.length-2} weitere</div>` : '');
+    el.onclick = () => showDayTermine(dateStr, d);
+    grid.appendChild(el);
+  }
+
+  // Heute-Spalte
+  renderHeuteTermine(todayStr);
+
+  // Terminvorschläge
+  renderTerminvorschlaege();
+}
+
+function showDayTermine(dateStr, day) {
+  calSelectedDay = dateStr;
+  buildCalendar(); // Neuzeichnen mit Markierung
+
+  const tage = termineAmTag(dateStr);
+  const panel = document.getElementById('calDayTermine');
+  const label = document.getElementById('calDayLabel');
+  const list  = document.getElementById('calDayList');
+  const d = new Date(dateStr+'T12:00:00');
+  label.textContent = d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+  if (tage.length === 0) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--color-text-tertiary)">Keine Termine – <span style="color:var(--accent);cursor:pointer" onclick="openTerminDialog('','${dateStr}')">+ Termin anlegen</span></div>`;
+  } else {
+    list.innerHTML = tage.map(t => renderTerminCard(t, true)).join('');
+  }
+  panel.style.display = 'block';
+}
+
+function renderTerminCard(t, clickable=false) {
+  const kundeLabel = t.kunde || '';
+  const zeitStr = [t.von, t.bis].filter(Boolean).join(' – ');
+  return `<div style="padding:10px;background:var(--accent-bg);border-radius:var(--border-radius-md);border-left:3px solid var(--accent);${clickable?'cursor:pointer':''}"
+    ${clickable ? `onclick="openTerminDialog('${t.id}')"` : ''}>
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:13px;font-weight:500">${kundeLabel || 'Allgemeiner Termin'}</div>
+      <span style="font-size:11px;color:var(--color-text-tertiary)">${zeitStr}</span>
+    </div>
+    ${t.bemerkung ? `<div style="font-size:11px;color:var(--color-text-secondary);margin-top:3px">${t.bemerkung}</div>` : ''}
+  </div>`;
+}
+
+function renderHeuteTermine(todayStr) {
+  const tage = termineAmTag(todayStr);
+  const el = document.getElementById('calToday');
+  if (!el) return;
+  const today = new Date();
+  el.innerHTML = `<div style="font-size:12px;color:var(--color-text-tertiary);margin-bottom:6px">${today.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'})}</div>`;
+  if (tage.length === 0) {
+    el.innerHTML += `<div style="font-size:12px;color:var(--color-text-tertiary)">Keine Termine heute</div>`;
+  } else {
+    el.innerHTML += tage.map(t => renderTerminCard(t, true)).join('');
+  }
+}
+
+function renderTerminvorschlaege() {
+  const el = document.getElementById('terminVorschlaege');
+  if (!el) return;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - 3);
+  const faellig = alleKunden.filter(k => {
+    if (!k.datum_letzte_lieferung) return false;
+    return new Date(k.datum_letzte_lieferung) < cutoff;
+  }).sort((a,b) => new Date(a.datum_letzte_lieferung) - new Date(b.datum_letzte_lieferung));
+
+  if (faellig.length === 0) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary)">Alle Kunden aktuell beliefert ✓</div>';
+    return;
+  }
+  el.innerHTML = faellig.slice(0,8).map(k => {
+    const lief = new Date(k.datum_letzte_lieferung);
+    const diffDays = Math.floor((new Date() - lief) / 86400000);
+    const diffMon = Math.floor(diffDays / 30);
+    return `<div style="padding:8px 10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);border-left:3px solid #FAC775;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${k.firma}</div>
+        <div style="font-size:10px;color:var(--color-text-tertiary)">Lieferung vor ${diffMon} Mon. · ${lief.toLocaleDateString('de-DE')}</div>
+      </div>
+      <button class="btn" style="padding:3px 8px;font-size:11px;flex-shrink:0;white-space:nowrap" onclick="openTerminDialog('','','${k.firma}')">
+        <i class="ti ti-plus" style="font-size:11px"></i>Termin
+      </button>
+    </div>`;
+  }).join('');
+  if (faellig.length > 8) {
+    el.innerHTML += `<div style="font-size:11px;color:var(--color-text-tertiary);text-align:center;padding-top:6px">+${faellig.length-8} weitere</div>`;
+  }
+}
+
+// ── Autofill Kunden-Suche im Termin-Dialog ──
+function filterTerminKunden(q) {
+  const dd = document.getElementById('terminKundenDropdown');
+  if (!q.trim()) { dd.style.display='none'; return; }
+  const hits = alleKunden.filter(k => k.firma.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  if (!hits.length) { dd.style.display='none'; return; }
+  dd.innerHTML = hits.map(k =>
+    `<div onclick="selectTerminKunde('${k.firma.replace(/'/g,"\\'")}')"
+      style="padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:0.5px solid var(--color-border-tertiary)"
+      onmouseover="this.style.background='var(--color-background-secondary)'"
+      onmouseout="this.style.background=''">${k.firma}
+      <span style="font-size:11px;color:var(--color-text-tertiary);margin-left:6px">${k.ort||''}</span>
+    </div>`
+  ).join('');
+  dd.style.display = 'block';
+}
+
+function showTerminDropdown() {
+  const q = document.getElementById('terminKundeInput').value;
+  if (q.trim()) filterTerminKunden(q);
+}
+
+function selectTerminKunde(firma) {
+  document.getElementById('terminKundeInput').value = firma;
+  document.getElementById('terminKundenDropdown').style.display = 'none';
+}
+
+// Dropdown schließen bei Klick außerhalb
+document.addEventListener('click', function(e) {
+  const dd = document.getElementById('terminKundenDropdown');
+  const inp = document.getElementById('terminKundeInput');
+  if (dd && inp && !dd.contains(e.target) && e.target !== inp) dd.style.display = 'none';
+});
+
+// ── Termin-Dialog ──────────────────────────
+function openTerminDialog(terminId='', datum='', kundeVor='') {
+  editTerminId = terminId || null;
+  const modal  = document.getElementById('terminModal');
+  const title  = document.getElementById('terminModalTitle');
+  const delBtn = document.getElementById('terminDeleteBtn');
+
+  if (terminId) {
+    const t = termine.find(x => x.id === terminId);
+    if (!t) return;
+    title.textContent = 'Termin bearbeiten';
+    delBtn.style.display = 'flex';
+    document.getElementById('terminKundeInput').value = t.kunde || '';
+    document.getElementById('terminDatum').value      = t.datum || '';
+    document.getElementById('terminVon').value        = t.von   || '';
+    document.getElementById('terminBis').value        = t.bis   || '';
+    document.getElementById('terminBemerkung').value  = t.bemerkung || '';
+  } else {
+    title.textContent = 'Termin anlegen';
+    delBtn.style.display = 'none';
+    document.getElementById('terminKundeInput').value = kundeVor || '';
+    document.getElementById('terminDatum').value      = datum || new Date().toISOString().slice(0,10);
+    document.getElementById('terminVon').value        = '09:00';
+    document.getElementById('terminBis').value        = '10:00';
+    document.getElementById('terminBemerkung').value  = '';
+  }
+
+  document.getElementById('terminKundenDropdown').style.display = 'none';
+  modal.style.display = 'flex';
+}
+
+function closeTerminDialog() {
+  document.getElementById('terminModal').style.display = 'none';
+  editTerminId = null;
+}
+
+function saveTermin() {
+  const kunde     = document.getElementById('terminKundeInput').value.trim();
+  const datum     = document.getElementById('terminDatum').value;
+  const von       = document.getElementById('terminVon').value;
+  const bis       = document.getElementById('terminBis').value;
+  const bemerkung = document.getElementById('terminBemerkung').value.trim();
+  if (!datum) { alert('Bitte ein Datum auswählen.'); return; }
+
+  if (editTerminId) {
+    const idx = termine.findIndex(t => t.id === editTerminId);
+    if (idx >= 0) termine[idx] = { ...termine[idx], kunde, datum, von, bis, bemerkung };
+  } else {
+    termine.push({ id:'T'+Date.now(), kunde, datum, von, bis, bemerkung });
+  }
+  saveTermineLocal();
+  closeTerminDialog();
+  buildCalendar();
+  if (calSelectedDay) showDayTermine(calSelectedDay, parseInt(calSelectedDay.split('-')[2]));
+}
+
+function deleteTermin() {
+  if (!editTerminId) return;
+  if (!confirm('Termin wirklich löschen?')) return;
+  termine = termine.filter(t => t.id !== editTerminId);
+  saveTermineLocal();
+  closeTerminDialog();
+  buildCalendar();
+  if (calSelectedDay) showDayTermine(calSelectedDay, parseInt(calSelectedDay.split('-')[2]));
+}
+
+// Modal schließen beim Klick auf Hintergrund
+document.getElementById('terminModal').addEventListener('click', function(e) {
+  if (e.target === this) closeTerminDialog();
+});
+
+function calPrev() { calMonth--; if(calMonth<0){calMonth=11;calYear--;} calSelectedDay=null; buildCalendar(); }
+function calNext() { calMonth++; if(calMonth>11){calMonth=0;calYear++;} calSelectedDay=null; buildCalendar(); }
+
+// ═══════════════════════════════════════════
+// 9. CSV-IMPORT
+// ═══════════════════════════════════════════
+const APP_FELDER = [
+  // ── Kunde / Stammdaten ──
+  { key:'kdnr',                label:'Kundennummer',            pflicht:true,  gruppe:'Stammdaten' },
+  { key:'firma',               label:'Firma',                   pflicht:true,  gruppe:'Stammdaten' },
+  { key:'strasse',             label:'Straße',                  pflicht:false, gruppe:'Stammdaten' },
+  { key:'plz',                 label:'PLZ',                     pflicht:false, gruppe:'Stammdaten' },
+  { key:'ort',                 label:'Ort',                     pflicht:false, gruppe:'Stammdaten' },
+  { key:'konditionsgruppe',    label:'Konditionsgruppe',        pflicht:false, gruppe:'Stammdaten' },
+  { key:'listungsnummer',      label:'Listungsnummer',          pflicht:false, gruppe:'Stammdaten' },
+  { key:'zahlungsbedingung',   label:'Zahlungsbedingung',       pflicht:false, gruppe:'Stammdaten' },
+  { key:'datum_letzte_lieferung', label:'Datum letzte Lieferung', pflicht:false, gruppe:'Stammdaten' },
+  { key:'datum_letzter_kauf',  label:'Datum letzter Kauf',      pflicht:false, gruppe:'Stammdaten' },
+  // ── Ansprechpartner ──
+  { key:'ap_anrede',           label:'Anrede',                  pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_vorname',          label:'Vorname',                 pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_name',             label:'Name',                    pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_funktion',         label:'Funktion',                pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_mobil',            label:'Telefon (Mobil)',         pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_telefon',          label:'Telefon (Geschäftlich)',  pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_zentrale',         label:'Telefon (Zentrale)',      pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_email',            label:'E-Mail (Geschäftlich)',   pflicht:false, gruppe:'Ansprechpartner' },
+  { key:'ap_email_zentrale',   label:'E-Mail (Zentrale)',       pflicht:false, gruppe:'Ansprechpartner' },
+  // ── Umsatz & Kennzahlen ──
+  { key:'ae_aj',               label:'AE (AJ)',                 pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_vj',               label:'AE (VJ)',                 pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_abweichung',       label:'AE Abweichung',           pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_saison_fs_aj',     label:'AE Saison FS (AJ)',       pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_saison_fs_vj',     label:'AE Saison FS (VJ)',       pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_saison_hw_aj',     label:'AE Saison HW (AJ)',       pflicht:false, gruppe:'Kennzahlen' },
+  { key:'ae_saison_hw_vj',     label:'AE Saison HW (VJ)',       pflicht:false, gruppe:'Kennzahlen' },
+  { key:'umsatz_aktuell',      label:'Umsatz (AJ)',             pflicht:false, gruppe:'Kennzahlen' },
+  { key:'umsatz_vj',           label:'Umsatz (VJ)',             pflicht:false, gruppe:'Kennzahlen' },
+  { key:'umsatz_abweichung',   label:'Umsatz Abweichung',       pflicht:false, gruppe:'Kennzahlen' },
+  { key:'auftragsbestand_aj',  label:'Auftragsbestand (AJ)',    pflicht:false, gruppe:'Kennzahlen' },
+  { key:'auftragsbestand_nj',  label:'Auftragsbestand (NJ)',    pflicht:false, gruppe:'Kennzahlen' },
+  { key:'wert_auslieferung',   label:'Wert in Auslieferung',    pflicht:false, gruppe:'Kennzahlen' },
+];
+let csvHeaders = [], csvData = [], csvFile = null;
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor='';
+  handleFile(e.dataTransfer.files[0]);
+}
+
+function handleFile(file) {
+  if (!file) return;
+  csvFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').filter(l=>l.trim());
+    if (lines.length < 2) { alert('CSV ist leer oder hat keine Datenzeilen.'); return; }
+    const sep = lines[0].includes(';') ? ';' : ',';
+    csvHeaders = lines[0].split(sep).map(h=>h.trim().replace(/^"|"$/g,''));
+    csvData = lines.slice(1).map(l => {
+      const vals = l.split(sep).map(v=>v.trim().replace(/^"|"$/g,''));
+      const obj = {};
+      csvHeaders.forEach((h,i) => obj[h] = vals[i]||'');
+      return obj;
+    });
+    const saved = loadMapping();
+    if (saved) {
+      document.getElementById('savedMappingHint').style.display='block';
+      document.getElementById('savedMappingFields').textContent = Object.values(saved).filter(Boolean).join(', ');
+    }
+    buildMappingUI();
+    csvGoto(2);
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function buildMappingUI() {
+  const saved = loadMapping() || {};
+  // Felder nach Gruppe zusammenfassen
+  const gruppen = {};
+  APP_FELDER.forEach(f => {
+    if (!gruppen[f.gruppe]) gruppen[f.gruppe] = [];
+    gruppen[f.gruppe].push(f);
+  });
+  const gruppenIcons = { 'Stammdaten':'ti-building', 'Ansprechpartner':'ti-user', 'Kennzahlen':'ti-chart-bar' };
+  let html = '';
+  Object.entries(gruppen).forEach(([gruppe, felder]) => {
+    html += `<div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.07em;color:var(--color-text-tertiary);margin:14px 0 8px;display:flex;align-items:center;gap:6px">
+      <i class="ti ${gruppenIcons[gruppe]||'ti-list'}" style="font-size:14px"></i>${gruppe}
+    </div>`;
+    felder.forEach(f => {
+      // Auto-Match: CSV-Spalte suchen die dem Label ähnelt
+      const bestMatch = csvHeaders.find(h => h === f.label) ||
+        csvHeaders.find(h => h.toLowerCase() === f.label.toLowerCase()) ||
+        (saved[f.key] && csvHeaders.includes(saved[f.key]) ? saved[f.key] : '') || '';
+      html += `<div class="col-map-row">
+        <label style="font-size:12px">${f.label}${f.pflicht?' <span style="color:#A32D2D">*</span>':''}</label>
+        <select id="map_${f.key}" style="font-size:12px;padding:5px 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary)">
+          <option value="">– nicht zuordnen –</option>
+          ${csvHeaders.map(h=>`<option value="${h}" ${(saved[f.key]===h || (!saved[f.key] && h===bestMatch))?'selected':''}>${h}</option>`).join('')}
+        </select>
+      </div>`;
+    });
+  });
+  document.getElementById('mappingRows').innerHTML = html;
+}
+
+function loadMapping() {
+  try { return JSON.parse(localStorage.getItem('fieldcrm_mapping')); } catch(e){ return null; }
+}
+
+function saveMapping() {
+  const mapping = {};
+  APP_FELDER.forEach(f => { mapping[f.key] = document.getElementById('map_'+f.key)?.value || ''; });
+  localStorage.setItem('fieldcrm_mapping', JSON.stringify(mapping));
+  runImport(mapping);
+}
+
+// ── Datum: DD.MM.YYYY HH:MM → YYYY-MM-DD ──
+function parseDate(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  const m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return null;
+}
+
+// ── Zahl: "1.234,56" → 1234.56 ──
+function parseZahl(str) {
+  if (!str) return null;
+  const n = parseFloat(String(str).replace(/\./g,'').replace(',','.'));
+  return isNaN(n) ? null : n;
+}
+
+async function runImport(mapping) {
+  mapping = mapping || loadMapping();
+  if (!mapping) { alert('Kein Mapping gefunden.'); return; }
+  if (!csvData.length) { alert('Keine CSV-Daten geladen.'); return; }
+
+  let neuCount = 0, updateCount = 0, fehler = 0;
+  const kw = getKW();
+  const jahr = new Date().getFullYear();
+
+  for (const row of csvData) {
+    try {
+      const kdnr  = mapping.kdnr  ? row[mapping.kdnr]  : '';
+      const firma = mapping.firma  ? row[mapping.firma] : '';
+      if (!firma) continue;
+
+      // ── Kundenstammdaten ──
+      const kundeData = {
+        firma,
+        strasse:           mapping.strasse            ? row[mapping.strasse]            : '',
+        plz:               mapping.plz                ? row[mapping.plz]                : '',
+        ort:               mapping.ort                ? row[mapping.ort]                : '',
+        konditionsgruppe:  mapping.konditionsgruppe   ? row[mapping.konditionsgruppe]   : '',
+        listungsnummer:    mapping.listungsnummer      ? row[mapping.listungsnummer]     : '',
+        zahlungsbedingung: mapping.zahlungsbedingung  ? row[mapping.zahlungsbedingung]  : '',
+        datum_letzte_lieferung: mapping.datum_letzte_lieferung ? parseDate(row[mapping.datum_letzte_lieferung]) : null,
+        datum_letzter_kauf:     mapping.datum_letzter_kauf     ? parseDate(row[mapping.datum_letzter_kauf])     : null,
+      };
+      if (kdnr) kundeData.kdnr = kdnr;
+
+      // ── Umsatz-Werte aus dieser Zeile ──
+      const umsatz_aj  = parseZahl(mapping.umsatz_aktuell   ? row[mapping.umsatz_aktuell]   : '');
+      const umsatz_vj  = parseZahl(mapping.umsatz_vj        ? row[mapping.umsatz_vj]        : '');
+      const ae_aj      = parseZahl(mapping.ae_aj            ? row[mapping.ae_aj]            : '');
+      const ae_vj      = parseZahl(mapping.ae_vj            ? row[mapping.ae_vj]            : '');
+      const ae_abw     = parseZahl(mapping.ae_abweichung    ? row[mapping.ae_abweichung]    : '');
+      const ae_fs_aj   = parseZahl(mapping.ae_saison_fs_aj  ? row[mapping.ae_saison_fs_aj]  : '');
+      const ae_fs_vj   = parseZahl(mapping.ae_saison_fs_vj  ? row[mapping.ae_saison_fs_vj]  : '');
+      const ae_hw_aj   = parseZahl(mapping.ae_saison_hw_aj  ? row[mapping.ae_saison_hw_aj]  : '');
+      const ae_hw_vj   = parseZahl(mapping.ae_saison_hw_vj  ? row[mapping.ae_saison_hw_vj]  : '');
+      const ab_aj      = parseZahl(mapping.auftragsbestand_aj ? row[mapping.auftragsbestand_aj] : '');
+      const ab_nj      = parseZahl(mapping.auftragsbestand_nj ? row[mapping.auftragsbestand_nj] : '');
+      const wert_ausl  = parseZahl(mapping.wert_auslieferung ? row[mapping.wert_auslieferung] : '');
+
+      // ── Ansprechpartner ──
+      const apVorname  = mapping.ap_vorname  ? row[mapping.ap_vorname]  : '';
+      const apName     = mapping.ap_name     ? row[mapping.ap_name]     : '';
+      const apFullName = [apVorname, apName].filter(Boolean).join(' ');
+
+      if (sb) {
+        // ── Supabase: Kunde upsert ──
+        const { data, error } = await sb.from('kunden')
+          .upsert(kundeData, { onConflict: kdnr ? 'kdnr' : 'firma' })
+          .select().single();
+        if (error) { fehler++; continue; }
+        const kundeId = data.id;
+        const existing = alleKunden.find(k => k.kdnr === kdnr || k.firma === firma);
+        if (existing) updateCount++; else neuCount++;
+
+        // ── Umsatz-Verlaufseintrag ──
+        if (umsatz_aj !== null) {
+          await sb.from('umsatz_verlauf').insert({
+            kunden_id: kundeId,
+            import_kw: 'KW' + kw,
+            import_jahr: jahr,
+            umsatz: umsatz_aj,
+            umsatz_vj,
+            ae_aj, ae_vj, ae_abweichung: ae_abw,
+            ae_saison_fs_aj: ae_fs_aj, ae_saison_fs_vj: ae_fs_vj,
+            ae_saison_hw_aj: ae_hw_aj, ae_saison_hw_vj: ae_hw_vj,
+            auftragsbestand_aj: ab_aj, auftragsbestand_nj: ab_nj,
+            wert_auslieferung: wert_ausl
+          });
+        }
+
+        // ── Ansprechpartner: erst suchen, dann update oder insert ──
+        if (apFullName) {
+          const apData = {
+            kunden_id: kundeId,
+            name:      apFullName,
+            funktion:  mapping.ap_funktion      ? row[mapping.ap_funktion]      : '',
+            anrede:    mapping.ap_anrede        ? row[mapping.ap_anrede]        : '',
+            telefon:   mapping.ap_telefon       ? row[mapping.ap_telefon]       : '',
+            zentrale:  mapping.ap_zentrale      ? row[mapping.ap_zentrale]      : '',
+            mobil:     mapping.ap_mobil         ? row[mapping.ap_mobil]         : '',
+            email:     mapping.ap_email         ? row[mapping.ap_email]         : '',
+            email_zentrale: mapping.ap_email_zentrale ? row[mapping.ap_email_zentrale] : '',
+            ist_haupt: true
+          };
+          // Prüfen ob AP mit diesem Namen bei dem Kunden existiert
+          const { data: existing_ap } = await sb.from('ansprechpartner')
+            .select('id').eq('kunden_id', kundeId).eq('name', apFullName).maybeSingle();
+          if (existing_ap) {
+            await sb.from('ansprechpartner').update(apData).eq('id', existing_ap.id);
+          } else {
+            await sb.from('ansprechpartner').insert(apData);
+          }
+        }
+
+      } else {
+        // ── Lokaler Demo-Modus (ohne DB) ──
+        const existing = alleKunden.find(k => (kdnr && k.kdnr === kdnr) || k.firma === firma);
+        if (existing) {
+          Object.assign(existing, kundeData);
+          if (umsatz_aj !== null) {
+            existing.umsatz_verlauf = existing.umsatz_verlauf || [];
+            existing.umsatz_verlauf.push({
+              import_kw: 'KW'+kw, umsatz: umsatz_aj,
+              ae_aj, ae_vj, ae_fs_aj, ae_hw_aj, ab_aj
+            });
+          }
+          updateCount++;
+        } else {
+          const neu = {
+            ...kundeData,
+            id: 'imp_'+Date.now()+'_'+Math.random(),
+            status: 'Aktiv',
+            ansprechpartner: [],
+            umsatz_verlauf: []
+          };
+          if (umsatz_aj !== null) neu.umsatz_verlauf.push({ import_kw:'KW'+kw, umsatz:umsatz_aj, ae_aj, ae_vj });
+          if (apFullName) {
+            neu.ansprechpartner.push({
+              id: 'ap_'+Date.now(),
+              name:     apFullName,
+              funktion: mapping.ap_funktion  ? row[mapping.ap_funktion]  : '',
+              anrede:   mapping.ap_anrede    ? row[mapping.ap_anrede]    : '',
+              telefon:  mapping.ap_telefon   ? row[mapping.ap_telefon]   : '',
+              zentrale: mapping.ap_zentrale  ? row[mapping.ap_zentrale]  : '',
+              mobil:    mapping.ap_mobil     ? row[mapping.ap_mobil]     : '',
+              email:    mapping.ap_email     ? row[mapping.ap_email]     : '',
+              email_zentrale: mapping.ap_email_zentrale ? row[mapping.ap_email_zentrale] : '',
+              ist_haupt: true
+            });
+          }
+          alleKunden.unshift(neu);
+          neuCount++;
+        }
+      }
+    } catch(e) { console.error(e); fehler++; }
+  }
+
+  document.getElementById('importSummary').textContent =
+    `${updateCount} aktualisiert · ${neuCount} neu angelegt · ${fehler} Fehler`;
+  document.getElementById('importDetails').innerHTML = `
+    <div class="stat-row"><span>Kunden aktualisiert</span><span style="color:#639922;font-weight:500">✓ ${updateCount}</span></div>
+    <div class="stat-row"><span>Neue Kunden</span><span style="color:#639922;font-weight:500">✓ ${neuCount}</span></div>
+    <div class="stat-row"><span>Fehler</span><span style="color:${fehler>0?'#A32D2D':'#639922'};font-weight:500">${fehler>0?'✗':'✓'} ${fehler}</span></div>
+    <div class="stat-row"><span>Spalten-Mapping gespeichert</span><span style="color:#639922;font-weight:500">✓ für nächste Woche</span></div>
+    <div class="stat-row"><span>Importiert KW / Jahr</span><span style="font-weight:500">KW ${kw} / ${jahr}</span></div>
+  `;
+  csvGoto(3);
+  renderKundenTable(alleKunden);
+  fillSelects();
+}
+
+function getKW() {
+  const d = new Date(); const jan4 = new Date(d.getFullYear(),0,4);
+  return Math.ceil(((d-jan4)/86400000+jan4.getDay()+1)/7);
+}
+
+let csvStepCur = 1;
+function csvGoto(n) {
+  csvStepCur = n;
+  document.querySelectorAll('.csv-step').forEach((s,i)=>s.classList.toggle('active',i===n-1));
+  document.getElementById('csvStepLabel').textContent = 'Schritt '+n+' von 3';
+}
+
+function resetImport() {
+  // Datei-Input zurücksetzen
+  const fileInput = document.getElementById('csvFile');
+  if (fileInput) fileInput.value = '';
+  csvHeaders = [];
+  csvData = [];
+  csvFile = null;
+  // Gespeichertes Mapping anzeigen falls vorhanden
+  const saved = loadMapping();
+  const hint = document.getElementById('savedMappingHint');
+  if (saved && hint) {
+    hint.style.display = 'block';
+    const fields = Object.entries(saved).filter(([,v])=>v).map(([,v])=>v).join(', ');
+    document.getElementById('savedMappingFields').textContent = fields;
+  }
+  csvGoto(1);
+}
+
+// ═══════════════════════════════════════════
+// 10. ROUTE – fehlende Funktionen
+// ═══════════════════════════════════════════
+
+function updateRoute() {
+  const body = document.getElementById('routeBody');
+  if (!body) return;
+  body.innerHTML = alleKunden.slice(0,6).map((k,i) => {
+    const ap = hauptAP(k);
+    const datumStr = k.letzter_besuch ? new Date(k.letzter_besuch).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '–';
+    return `<tr onclick="openDetail('${k.id}')">
+      <td style="color:var(--color-text-tertiary);font-weight:500">${i+1}</td>
+      <td><strong>${k.firma}</strong><div style="font-size:11px;color:var(--color-text-tertiary)">${k.ort||''}</div></td>
+      <td>${ap ? `<div style="font-size:13px">${ap.name}</div><div style="font-size:11px;color:var(--color-text-tertiary)">${ap.funktion||''}</div>` : '<span style="color:var(--color-text-tertiary)">–</span>'}</td>
+      <td onclick="event.stopPropagation()">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${ap && ap.telefon ? `<a href="tel:${formatTel(ap.telefon)}" class="btn call" style="padding:4px 9px;font-size:11px;text-decoration:none"><i class="ti ti-phone" style="font-size:12px"></i>Anrufen</a>` : ''}
+          ${ap && ap.email   ? `<a href="mailto:${ap.email}" class="btn mail" style="padding:4px 9px;font-size:11px;text-decoration:none"><i class="ti ti-mail" style="font-size:12px"></i>Mail</a>` : ''}
+          ${ap && ap.mobil   ? `<a href="sms:${formatTel(ap.mobil)}" class="btn sms" style="padding:4px 9px;font-size:11px;text-decoration:none"><i class="ti ti-message" style="font-size:12px"></i>SMS</a>` : ''}
+        </div>
+      </td>
+      <td style="font-size:12px;color:var(--color-text-secondary)">${datumStr}</td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn" style="padding:4px 8px;font-size:11px" onclick="document.getElementById('prepSelect').value='${k.id}';showView('vorbereitung');loadPrep()">
+          <i class="ti ti-clipboard-text" style="font-size:12px"></i>Vorber.
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+
+// Toggle: einzelne unbekannte Firma in der Liste ein-/ausblenden
+function toggleUnknownFirm(btn, id) {
+  btn.classList.toggle('on');
+  const sichtbar = btn.classList.contains('on');
+  // Index aus id (p0, p1, … oder u0, u1, …)
+  const idx = parseInt(id.replace(/\D/g,''));
+  if (gMapUnknownMarkers[idx]) {
+    gMapUnknownMarkers[idx].setMap(sichtbar ? gMap : null);
+  }
+  updateUnknownCount();
+}
+
+// Unbekannte Firma zur Tagesroute hinzufügen (als temporären Eintrag)
+function addUnknownToRoute(name, ort) {
+  const body = document.getElementById('routeBody');
+  if (!body) return;
+  // Prüfen ob bereits vorhanden
+  const existing = [...body.querySelectorAll('td strong')].some(el => el.textContent === name);
+  if (existing) { alert(name + ' ist bereits in der Route.'); return; }
+  const newRow = document.createElement('tr');
+  newRow.style.background = 'rgba(226,75,74,0.04)';
+  newRow.innerHTML = `
+    <td style="color:#E24B4A;font-weight:500">!</td>
+    <td>
+      <strong>${name}</strong>
+      <span class="pill red" style="margin-left:6px;font-size:10px">Neu</span>
+      <div style="font-size:11px;color:var(--color-text-tertiary)">${ort}</div>
+    </td>
+    <td style="color:var(--color-text-tertiary);font-size:12px">Noch kein Kontakt</td>
+    <td>–</td>
+    <td style="color:var(--color-text-tertiary)">–</td>
+    <td>
+      <button class="btn" style="padding:4px 8px;font-size:11px;color:#A32D2D;border-color:#F4C2C2" onclick="this.closest('tr').remove();updateUnknownCount()">
+        <i class="ti ti-x" style="font-size:12px"></i>Entfernen
+      </button>
+    </td>
+  `;
+  body.appendChild(newRow);
+}
+
+function updateUnknownCount() {
+  const badge = document.getElementById('unknownCount');
+  if (badge) badge.textContent = document.querySelectorAll('#unknownList .toggle.on').length;
+}
+
+// ═══════════════════════════════════════════
+// 11. EINSTELLUNGEN – fehlende Funktionen
+// ═══════════════════════════════════════════
+
+// ═══════════════════════════════════════════
+// 11. EINSTELLUNGEN – fehlende Funktionen
+// ═══════════════════════════════════════════
+
+// PLZ-Schnellauswahl Regionen – im neuen x-Format
+const PLZ_REGIONEN = [
+  { name:'DE: Bayern (9xx)',           muster:['9xx'] },
+  { name:'DE: Bayern Nord (90x–92x)',  muster:['90x','91x','92x'] },
+  { name:'DE: Bayern Süd (80x–84x)',   muster:['80x','81x','82x','83x','84x'] },
+  { name:'DE: Bayerischer Wald (94x)', muster:['94x'] },
+  { name:'DE: Baden-Württemberg',      muster:['68x','69x','70x','71x','72x','73x','74x','75x','76x','77x','78x','79x'] },
+  { name:'DE: NRW (4xx–5xx)',          muster:['4xx','5xx'] },
+  { name:'DE: Hessen (6xx)',           muster:['6xx'] },
+  { name:'DE: Rheinland-Pfalz',        muster:['54x','55x','56x','57x','65x','66x','67x'] },
+  { name:'DE: Sachsen (0xx)',          muster:['0xx'] },
+  { name:'DE: Brandenburg/Berlin',     muster:['10x','11x','12x','13x','14x','15x','16x'] },
+  { name:'DE: Hamburg/Schleswig-H.',   muster:['20x','21x','22x','23x','24x','25x'] },
+  { name:'DE: Niedersachsen',          muster:['26x','27x','28x','29x','30x','31x','32x','34x','37x','38x','49x'] },
+  { name:'AT: Österreich gesamt',      muster:['1xx','2xx','3xx','4xx','5xx','6xx','7xx','8xx','9xx'] },
+  { name:'AT: Wien (1xx)',             muster:['1xx'] },
+  { name:'AT: Steiermark (8xx)',       muster:['8xx'] },
+  { name:'AT: Tirol/Vorarlberg (6xx)', muster:['6xx'] },
+  { name:'CH: Schweiz gesamt',         muster:['1xxx','2xxx','3xxx','4xxx','5xxx','6xxx','7xxx','8xxx','9xxx'] },
+  { name:'CH: Zürich (8xxx)',          muster:['8xxx'] },
+  { name:'CH: Bern (3xxx)',            muster:['3xxx'] },
+];
+
+let plzBereiche = JSON.parse(localStorage.getItem('fieldcrm_plz') || '[]');
+
+// Validiert und normalisiert Eingabe: nur Ziffern und x, immer 3 Zeichen
+function normPlz(raw) {
+  const s = raw.toLowerCase().replace(/[^0-9x]/g, '').slice(0, 3);
+  return s;
+}
+
+// Prüft ob eine PLZ (5-stellig als String) zu einem Muster passt
+// Muster: '9xx' → beginnt mit 9, '94x' → beginnt mit 94, '904' → genau 904xx
+function plzMatchesMuster(plz5, muster) {
+  const p = plz5.toString().padStart(5, '0');
+  for (let i = 0; i < muster.length; i++) {
+    const m = muster[i];
+    if (m[i] !== 'x' && m[i] !== p[i]) return false;
+  }
+  return true;
+}
+
+// Lesbarer Text für ein Muster: '9xx' → '90000–99999'
+function plzMusterText(muster) {
+  const von = muster.replace(/x/g, '0').padEnd(5, '0');
+  const bis = muster.replace(/x/g, '9').padEnd(5, '9');
+  return `${von}–${bis}`;
+}
+
+// Anzahl der abgedeckten PLZ-Präfixe
+function plzMusterUmfang(muster) {
+  const wildcards = (muster.match(/x/g) || []).length;
+  return Math.pow(10, wildcards);
+}
+
+function formatPlzInput(inp) {
+  // Nur Ziffern und 'x' erlauben, lowercase
+  inp.value = inp.value.toLowerCase().replace(/[^0-9x]/g, '').slice(0, 3);
+  updatePlzPreview(inp.value);
+}
+
+function updatePlzPreview(val) {
+  const el = document.getElementById('plzPreview');
+  if (!el) return;
+  if (!val || val.length < 3) {
+    el.textContent = val.length > 0 ? `${3 - val.length} Zeichen fehlen` : '';
+    return;
+  }
+  const count = plzMusterUmfang(val);
+  el.textContent = `→ ${plzMusterText(val)} (${count === 1 ? '100' : count + '×100'} PLZ)`;
+}
+
+function renderPlzBereiche() {
+  const el = document.getElementById('plzBereiche');
+  if (!el) return;
+  if (plzBereiche.length === 0) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--color-text-tertiary)">Noch keine Bereiche – Routensuche ohne PLZ-Eingrenzung</span>';
+  } else {
+    el.innerHTML = plzBereiche.map(p => {
+      const wildcards = (p.match(/x/g) || []).length;
+      const bgColor = wildcards === 2 ? '#FFF5E0' : wildcards === 1 ? '#EAF3DE' : '#E6F1FB';
+      const txtColor = wildcards === 2 ? '#854F0B' : wildcards === 1 ? '#3B6D11' : '#185FA5';
+      const borderColor = wildcards === 2 ? '#FAC775' : wildcards === 1 ? '#8FBF00' : '#B5D4F4';
+      return `<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:${bgColor};border:0.5px solid ${borderColor};border-radius:99px;font-size:12px;font-weight:500;color:${txtColor};font-family:'Courier New',monospace;letter-spacing:1px">
+        ${p}
+        <span style="font-family:var(--font-sans);font-size:10px;opacity:0.7;letter-spacing:0">${plzMusterText(p)}</span>
+        <button onclick="removePlz('${p}')" style="background:none;border:none;cursor:pointer;color:${txtColor};font-size:15px;line-height:1;padding:0;margin-left:2px">×</button>
+      </span>`;
+    }).join('');
+  }
+  updatePlzRouteInfo();
+}
+
+function updatePlzRouteInfo() {
+  const el = document.getElementById('plzRouteInfo');
+  if (!el) return;
+  if (plzBereiche.length === 0) {
+    el.textContent = 'Noch keine PLZ-Bereiche eingetragen – Routensuche ohne Eingrenzung';
+    return;
+  }
+  const laender = getLaender();
+  const landNames = { de:'Deutschland', at:'Österreich', ch:'Schweiz', lu:'Luxemburg', li:'Liechtenstein' };
+  const landStr = laender.map(l => landNames[l] || l).join(', ');
+  const bereiche = plzBereiche.map(p => `${p} (${plzMusterText(p)})`).join(' · ');
+  el.innerHTML = `<span style="color:var(--accent);font-weight:500">${landStr}</span> · ${bereiche}`;
+}
+
+function renderPlzSchnell() {
+  const el = document.getElementById('plzSchnell');
+  if (!el) return;
+  el.innerHTML = PLZ_REGIONEN.map(r =>
+    `<button class="tag" onclick="addPlzRegion(${JSON.stringify(r.muster)}, this)" style="font-size:11px">
+      + ${r.name}
+    </button>`
+  ).join('');
+}
+
+function addPlzBereich() {
+  const inp = document.getElementById('plzInput');
+  const val = normPlz(inp.value);
+  if (val.length < 3) {
+    alert('Bitte genau 3 Zeichen eingeben.\nBeispiele: 9xx · 94x · 904');
+    return;
+  }
+  if (!plzBereiche.includes(val)) {
+    plzBereiche.push(val);
+    plzBereiche.sort();
+    localStorage.setItem('fieldcrm_plz', JSON.stringify(plzBereiche));
+  }
+  inp.value = '';
+  document.getElementById('plzPreview').textContent = '';
+  renderPlzBereiche();
+}
+
+function addPlzRegion(musterList, btn) {
+  let added = 0;
+  musterList.forEach(p => {
+    if (!plzBereiche.includes(p)) { plzBereiche.push(p); added++; }
+  });
+  if (added > 0) {
+    plzBereiche.sort();
+    localStorage.setItem('fieldcrm_plz', JSON.stringify(plzBereiche));
+  }
+  btn.classList.add('active');
+  renderPlzBereiche();
+}
+
+function removePlz(p) {
+  plzBereiche = plzBereiche.filter(x => x !== p);
+  localStorage.setItem('fieldcrm_plz', JSON.stringify(plzBereiche));
+  renderPlzBereiche();
+}
+
+function clearAllPlz() {
+  if (!confirm('Alle PLZ-Bereiche löschen?')) return;
+  plzBereiche = [];
+  localStorage.setItem('fieldcrm_plz', JSON.stringify(plzBereiche));
+  renderPlzBereiche();
+}
+
+// Prüft ob eine Kunden-PLZ im eingestellten Gebiet liegt
+function plzInGebiet(plz) {
+  if (!plzBereiche.length) return true; // Keine Eingrenzung = alles erlaubt
+  const p = String(plz || '').replace(/\D/g, '');
+  return plzBereiche.some(muster => {
+    for (let i = 0; i < muster.length; i++) {
+      if (muster[i] !== 'x' && muster[i] !== p[i]) return false;
+    }
+    return true;
+  });
+}
+
+// Gibt die Google Places-Suchregion als Bounds-String zurück (vereinfacht)
+function getPlzRouteBounds() {
+  const laender = getLaender();
+  const landBounds = {
+    de: { center: '51.1657,10.4515', zoom: 6 },
+    at: { center: '47.5162,14.5501', zoom: 7 },
+    ch: { center: '46.8182,8.2275',  zoom: 8 },
+    lu: { center: '49.8153,6.1296',  zoom: 9 },
+    li: { center: '47.1660,9.5554',  zoom: 10 },
+  };
+  return laender.map(l => landBounds[l]).filter(Boolean);
+}
+
+// Zähler aktive Places-Typen
+function updatePlacesCount() {
+  const count = document.querySelectorAll('[data-type].active').length;
+  const el = document.getElementById('activePlacesCount');
+  if (el) el.textContent = count + ' aktiv';
+}
+
+function savePlacesTypes() {
+  const active = [...document.querySelectorAll('[data-type].active')].map(el => el.dataset.type);
+  localStorage.setItem('fieldcrm_places_types', JSON.stringify(active));
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-check"></i>Gespeichert';
+  setTimeout(() => { btn.innerHTML = orig; }, 2000);
+}
+
+function loadPlacesTypes() {
+  const saved = JSON.parse(localStorage.getItem('fieldcrm_places_types') || '[]');
+  if (!saved.length) return; // Defaults belassen
+  document.querySelectorAll('[data-type]').forEach(el => {
+    el.classList.toggle('active', saved.includes(el.dataset.type));
+  });
+  updatePlacesCount();
+}
+
+// Länder-Auswahl speichern
+function getLaender() {
+  return [...document.querySelectorAll('#laenderTags .tag.active')].map(t => t.dataset.land);
+}
+
+function addCustomTag(listId) {
+  const name = prompt('Name der neuen Gruppe:');
+  if (!name || !name.trim()) return;
+  const list = document.getElementById(listId);
+  if (!list) return;
+  const tag = document.createElement('div');
+  tag.className = 'tag active';
+  tag.textContent = name.trim();
+  tag.onclick = function() { this.classList.toggle('active'); };
+  list.appendChild(tag);
+}
+
+function saveEinstellungen() {
+  // Branchen
+  const branchen = [...document.querySelectorAll('#branchenTags .tag.active')].map(t=>t.textContent.trim());
+  localStorage.setItem('fieldcrm_branchen', JSON.stringify(branchen));
+  // Artikelgruppen
+  const artgruppen = [...document.querySelectorAll('#artgruppenTags .tag.active')].map(t=>t.textContent.trim());
+  localStorage.setItem('fieldcrm_artgruppen', JSON.stringify(artgruppen));
+  // Länder
+  localStorage.setItem('fieldcrm_laender', JSON.stringify(getLaender()));
+  // PLZ bereits auto-gespeichert
+  // Places-Types
+  savePlacesTypes();
+
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<i class="ti ti-check"></i>Gespeichert';
+  btn.style.background = '#639922';
+  setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+}
+
+// Einstellungen beim Öffnen laden
+function initEinstellungen() {
+  renderPlzBereiche();
+  renderPlzSchnell();
+  loadPlacesTypes();
+
+  // Länder
+  const savedLaender = JSON.parse(localStorage.getItem('fieldcrm_laender') || '["de"]');
+  document.querySelectorAll('#laenderTags .tag').forEach(t => {
+    t.classList.toggle('active', savedLaender.includes(t.dataset.land));
+  });
+
+  // Places-Typen: Zähler-Update bei Klick
+  document.querySelectorAll('[data-type]').forEach(el => {
+    el.onclick = function() { this.classList.toggle('active'); updatePlacesCount(); };
+  });
+  updatePlacesCount();
+}
+
+function saveMapsKey() {
+  const key   = document.getElementById('cfgMapsKey').value.trim();
+  const mapId = document.getElementById('cfgMapsId').value.trim();
+  if (!key) { alert('Bitte Google Maps API-Key eingeben.'); return; }
+  localStorage.setItem('fieldcrm_mapskey', key);
+  if (mapId) {
+    localStorage.setItem('fieldcrm_mapsid', mapId);
+  } else {
+    localStorage.removeItem('fieldcrm_mapsid');
+  }
+  document.getElementById('mapsStatus').textContent = '✓ Gespeichert';
+  document.getElementById('mapsStatus').style.background = '#EAF3DE';
+  document.getElementById('mapsStatus').style.color = '#3B6D11';
+  // Karte komplett neu initialisieren
+  gMapsLoaded = false;
+  gMap = null;
+  const old = document.getElementById('googleMapsScript');
+  if (old) old.remove();
+  ladeMapsAPI();
+}
+
+function testMapsKey() {
+  const key = localStorage.getItem('fieldcrm_mapskey') || document.getElementById('cfgMapsKey').value.trim();
+  if (!key) { alert('Zuerst API-Key speichern.'); return; }
+  // Einfacher Verbindungstest über Static Maps
+  const testUrl = `https://maps.googleapis.com/maps/api/staticmap?center=Erlangen&zoom=10&size=1x1&key=${key}`;
+  fetch(testUrl).then(r => {
+    if (r.ok) {
+      document.getElementById('mapsStatus').textContent = '✓ Verbunden';
+      document.getElementById('mapsStatus').style.background = '#EAF3DE';
+      document.getElementById('mapsStatus').style.color = '#3B6D11';
+    } else {
+      document.getElementById('mapsStatus').textContent = '✗ Key ungültig';
+      document.getElementById('mapsStatus').style.background = '#FCEBEB';
+      document.getElementById('mapsStatus').style.color = '#A32D2D';
+    }
+  }).catch(()=>{
+    document.getElementById('mapsStatus').textContent = '⚠ Netzwerk-Fehler';
+  });
+}
+
+// Beim Laden gespeicherte Werte in Felder eintragen
+(function loadSavedMapsKey() {
+  const k = localStorage.getItem('fieldcrm_mapskey');
+  const m = localStorage.getItem('fieldcrm_mapsid');
+  if (k) { const el = document.getElementById('cfgMapsKey'); if (el) el.value = k; }
+  if (m) { const el = document.getElementById('cfgMapsId');  if (el) el.value = m; }
+})();
+
+// ═══════════════════════════════════════════
+// PDF-EXPORT BESUCHSVORBEREITUNG
+// ═══════════════════════════════════════════
+function exportPrepPdf(kundeIdOverride) {
+  const id = kundeIdOverride || document.getElementById('prepSelect').value;
+  const k  = alleKunden.find(c => String(c.id) === String(id));
+  if (!k) {
+    if (kundeIdOverride) {
+      document.getElementById('prepSelect').value = kundeIdOverride;
+      loadPrep();
+      setTimeout(() => exportPrepPdf(kundeIdOverride), 400);
+    } else {
+      alert('Bitte zuerst einen Kunden auswählen.');
+    }
+    return;
+  }
+
+  const aps  = k.ansprechpartner || [];
+  const v    = k.umsatz_verlauf  || [];
+  const last = v.length ? v[v.length-1] : {};
+
+  const fe = (val) => (val !== null && val !== undefined && val !== '') ? '€\u00a0' + Number(val).toLocaleString('de-DE', {minimumFractionDigits:0}) : '–';
+  const pct = (val) => { const n=Number(val); if(isNaN(n))return'–'; return (n>=0?'+':'')+n.toFixed(1).replace('.',',')+'\u00a0%'; };
+  const dc  = (val) => { const n=Number(val); if(isNaN(n)||n===0)return'#666'; return n>0?'#2D6A00':'#A32D2D'; };
+
+  const datum       = new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'});
+  const letzterBes  = k.letzter_besuch ? new Date(k.letzter_besuch).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '–';
+  const letzteLief  = k.datum_letzte_lieferung ? new Date(k.datum_letzte_lieferung).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '–';
+  const letzterKauf = k.datum_letzter_kauf ? new Date(k.datum_letzter_kauf).toLocaleDateString('de-DE',{day:'2-digit',month:'long',year:'numeric'}) : '–';
+
+  const kennzahlen = [
+    ['Umsatz (AJ)',           last.umsatz,           last.umsatz_vj,          null],
+    ['Auftragseingang (AJ)',  last.ae_aj,            last.ae_vj,              null],
+    ['AE Abweichung',        null,                  null,                    last.ae_abweichung],
+    ['Saison FS (AJ)',        last.ae_saison_fs_aj,  last.ae_saison_fs_vj,   null],
+    ['Saison HW (AJ)',        last.ae_saison_hw_aj,  last.ae_saison_hw_vj,   null],
+    ['Auftragsbestand (AJ)', last.auftragsbestand_aj, last.auftragsbestand_nj, null],
+    ['Wert in Auslieferung', last.wert_auslieferung, null,                   null],
+  ];
+
+  const kennzahlenRows = kennzahlen.map(([label, aj, vj, abw]) => {
+    const ajStr   = abw !== undefined && abw !== null ? pct(abw) : fe(aj);
+    const vjStr   = vj  !== undefined && vj  !== null ? fe(vj)  : '';
+    const diff    = (aj!==null&&aj!==undefined&&vj!==null&&vj!==undefined&&Number(vj)!==0)
+                    ? ((Number(aj)-Number(vj))/Number(vj)*100) : null;
+    const diffStr  = diff!==null ? pct(diff) : (abw!==null&&abw!==undefined ? pct(abw) : '');
+    const diffClr  = diff!==null ? dc(diff) : dc(abw);
+    return `<tr>
+      <td style="padding:7px 10px;border-bottom:0.5px solid #E3E1D8;font-size:12px">${label}</td>
+      <td style="padding:7px 10px;border-bottom:0.5px solid #E3E1D8;font-size:12px;font-weight:700;text-align:right">${ajStr}</td>
+      <td style="padding:7px 10px;border-bottom:0.5px solid #E3E1D8;font-size:12px;color:#5F5E5A;text-align:right">${vjStr}</td>
+      <td style="padding:7px 10px;border-bottom:0.5px solid #E3E1D8;font-size:12px;font-weight:700;color:${diffClr};text-align:right">${diffStr}</td>
+    </tr>`;
+  }).join('');
+
+  // SVG Verlaufschart
+  const verlaufSvg = (() => {
+    if (v.length < 2) return '<p style="font-size:12px;color:#9B9891;font-style:italic;padding:10px 0">Kein Verlauf vorhanden</p>';
+    const vals   = v.map(e=>Number(e.umsatz)||0);
+    const valsVj = v.map(e=>Number(e.umsatz_vj)||0);
+    const maxV   = Math.max(...vals,...valsVj,1);
+    const W=520,H=110,padL=40,padB=20,padT=16;
+    const xStep  = (W-padL)/(vals.length-1);
+    const yS     = (val)=>padT+(H-padT-padB)*(1-val/maxV);
+    const pts    = (arr)=>arr.map((vv,i)=>`${padL+i*xStep},${yS(vv)}`).join(' ');
+    const area   = (arr)=>`${padL},${H-padB} ${arr.map((vv,i)=>`${padL+i*xStep},${yS(vv)}`).join(' ')} ${padL+(arr.length-1)*xStep},${H-padB}`;
+    const fmtK   = val=>val>=1000?'€'+Math.round(val/1000)+'k':'€'+val;
+    return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:120px">
+      <text x="0" y="${padT}" font-size="9" fill="#9B9891" dominant-baseline="middle">${fmtK(maxV)}</text>
+      <text x="0" y="${H-padB}" font-size="9" fill="#9B9891" dominant-baseline="middle">0</text>
+      <line x1="${padL}" y1="${padT}" x2="${W}" y2="${padT}" stroke="#E3E1D8" stroke-width="0.5"/>
+      <line x1="${padL}" y1="${H-padB}" x2="${W}" y2="${H-padB}" stroke="#E3E1D8" stroke-width="0.5"/>
+      <polygon points="${area(valsVj)}" fill="rgba(207,205,196,0.25)"/>
+      <polyline points="${pts(valsVj)}" fill="none" stroke="#CFCDC4" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <polygon points="${area(vals)}" fill="rgba(143,191,0,0.15)"/>
+      <polyline points="${pts(vals)}" fill="none" stroke="#8FBF00" stroke-width="2.5"/>
+      ${vals.map((vv,i)=>`<circle cx="${padL+i*xStep}" cy="${yS(vv)}" r="3.5" fill="#8FBF00"/>`).join('')}
+      ${v.map((e,i)=>`<text x="${padL+i*xStep}" y="${H-2}" font-size="8" text-anchor="middle" fill="#9B9891">${e.import_kw||''}</text>`).join('')}
+      <text x="${W}" y="${padT-4}" font-size="9" fill="#8FBF00" text-anchor="end">— AJ</text>
+      <text x="${W}" y="${padT+8}" font-size="9" fill="#CFCDC4" text-anchor="end">- - VJ</text>
+    </svg>`;
+  })();
+
+  // Ansprechpartner
+  const apHtml = aps.map(a=>`
+    <div style="break-inside:avoid;padding:11px 13px;background:#F7F5EF;border-radius:6px;border-left:3px solid #8FBF00">
+      <div style="font-weight:700;font-size:13px;margin-bottom:2px">${a.anrede?a.anrede+' ':''}${a.name}</div>
+      <div style="font-size:11px;color:#5F5E5A;margin-bottom:7px">${a.funktion||''}</div>
+      <table style="font-size:11px;width:100%;border-collapse:collapse">
+        ${a.telefon?`<tr><td style="color:#9B9891;width:85px;padding:2px 0">Telefon</td><td style="font-weight:600">${a.telefon}</td></tr>`:''}
+        ${a.zentrale?`<tr><td style="color:#9B9891;padding:2px 0">Zentrale</td><td>${a.zentrale}</td></tr>`:''}
+        ${a.mobil?`<tr><td style="color:#9B9891;padding:2px 0">Mobil</td><td style="font-weight:600">${a.mobil}</td></tr>`:''}
+        ${a.email?`<tr><td style="color:#9B9891;padding:2px 0">E-Mail</td><td>${a.email}</td></tr>`:''}
+        ${a.email_zentrale?`<tr><td style="color:#9B9891;padding:2px 0">E-Mail Zentr.</td><td>${a.email_zentrale}</td></tr>`:''}
+      </table>
+    </div>`).join('');
+
+  // Notizen für PDF (ohne interne Notiz – die wird nie exportiert)
+  const notizen = ladeNotizenFuerPrep(k.id);
+  const typIconsPdf = { Besuch:'🤝', Telefonat:'📞', 'E-Mail':'✉', Hinweis:'💡', Sonstiges:'📝' };
+  const typBorderPdf = { Besuch:'#8FBF00', Telefonat:'#378ADD', 'E-Mail':'#7B5EA7', Hinweis:'#EF9F27', Sonstiges:'#CFCDC4' };
+  const notizenHtml = notizen.length ? `
+    <div class="stitle">Gesprächsnotizen</div>
+    ${notizen.map(n => {
+      const ts = new Date(n.ts);
+      const border = typBorderPdf[n.typ] || '#CFCDC4';
+      return `<div style="padding:9px 13px;background:#F7F5EF;border-left:3px solid ${border};border-radius:5px;margin-bottom:7px;break-inside:avoid">
+        <div style="font-size:11px;color:#5F5E5A;margin-bottom:3px">
+          ${typIconsPdf[n.typ]||'📝'} <strong>${n.typ}</strong> ·
+          ${ts.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'})}
+          ${ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr
+        </div>
+        <div style="font-size:12px;line-height:1.5;white-space:pre-wrap">${n.text}</div>
+      </div>`;
+    }).join('')}` : '';
+
+  // Notizen aus dem Formular lesen (ohne interne Notiz)
+  const zielEl = document.getElementById('prepZiel');
+  const mitEl  = document.getElementById('prepMitnahme');
+  const gpEl   = document.getElementById('prepGespraechspunkte');
+  const ziel   = zielEl?.value?.trim() || '';
+  const mit    = mitEl?.value?.trim()  || '';
+  const gp     = gpEl?.value?.trim()   || '';
+
+  const html = `<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Besuchsvorbereitung – ${k.firma}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Helvetica Neue',Arial,sans-serif;color:#1A1A1A;background:#fff;font-size:13px;line-height:1.5}
+@page{size:A4;margin:16mm 15mm 18mm 15mm}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none!important}.page-break{break-before:page}}
+.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:3px solid #8FBF00;margin-bottom:18px}
+.h-left h1{font-size:19px;font-weight:800;color:#1A1A1A;margin-bottom:2px}
+.h-left p{font-size:11px;color:#5F5E5A}
+.h-right{text-align:right;font-size:11px;color:#9B9891}
+.h-right strong{font-size:12px;color:#1A1A1A;display:block;margin-bottom:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.box{padding:11px 13px;background:#F7F5EF;border-radius:6px}
+.box h3{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#9B9891;margin-bottom:7px;font-weight:700}
+.ir{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:0.5px solid #E3E1D8}
+.ir:last-child{border-bottom:none}
+.ir-l{color:#5F5E5A}
+.ir-v{font-weight:700}
+.stitle{font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#5F5E5A;font-weight:700;margin:16px 0 7px;padding-bottom:4px;border-bottom:0.5px solid #E3E1D8}
+table.kz{width:100%;border-collapse:collapse;margin-bottom:14px}
+table.kz thead th{background:#8FBF00;color:#fff;padding:6px 10px;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;text-align:left}
+table.kz thead th:not(:first-child){text-align:right}
+.vbox{background:#F7F5EF;border-radius:6px;padding:10px 13px;margin-bottom:14px}
+.ap-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.gp{background:#EAF3DE;border-left:3px solid #8FBF00;border-radius:4px;padding:9px 13px;margin-bottom:8px}
+.gp h4{font-size:9px;text-transform:uppercase;letter-spacing:0.07em;color:#3B6D11;margin-bottom:3px;font-weight:700}
+.gp p{font-size:12px}
+.footer-bar{text-align:center;font-size:9px;color:#9B9891;margin-top:20px;padding-top:8px;border-top:0.5px solid #E3E1D8}
+.print-bar{display:flex;gap:10px;justify-content:flex-end;padding:10px 16px;background:#F7F5EF;border-bottom:0.5px solid #E3E1D8}
+.print-bar button{padding:7px 16px;border-radius:5px;border:none;cursor:pointer;font-size:13px;font-family:inherit}
+.pbtn{background:#8FBF00;color:#fff;font-weight:700}
+.cbtn{background:#fff;border:0.5px solid #CFCDC4!important;color:#1A1A1A}
+</style></head><body>
+<div class="print-bar no-print">
+  <button class="cbtn" onclick="window.close()">✕ Schließen</button>
+  <button class="pbtn" onclick="window.print()">⎙ Als PDF speichern</button>
+</div>
+<div style="padding:14px 0">
+<div class="header">
+  <div class="h-left">
+    <h1>${k.firma}</h1>
+    <p>${k.strasse?k.strasse+' · ':''}${k.plz||''} ${k.ort||''} · ${k.branche||''}</p>
+  </div>
+  <div class="h-right">
+    <strong>Besuchsvorbereitung</strong>
+    Erstellt: ${datum}<br>
+    Kundennr.: ${k.kdnr||'–'}<br>
+    Status: <span style="color:${k.status==='Aktiv'?'#2D6A00':'#854F0B'};font-weight:700">${k.status||'–'}</span>
+  </div>
+</div>
+<div class="grid2">
+  <div class="box"><h3>Stammdaten</h3>
+    <div class="ir"><span class="ir-l">Branche</span><span class="ir-v">${k.branche||'–'}</span></div>
+    <div class="ir"><span class="ir-l">Artikelgruppe</span><span class="ir-v">${k.artikelgruppe||'–'}</span></div>
+    <div class="ir"><span class="ir-l">Konditionsgruppe</span><span class="ir-v">${k.konditionsgruppe||'–'}</span></div>
+    <div class="ir"><span class="ir-l">Zahlungsbedingung</span><span class="ir-v">${k.zahlungsbedingung||'–'}</span></div>
+    <div class="ir"><span class="ir-l">Listungsnummer</span><span class="ir-v">${k.listungsnummer||'–'}</span></div>
+  </div>
+  <div class="box"><h3>Besuchshistorie</h3>
+    <div class="ir"><span class="ir-l">Letzter Besuch</span><span class="ir-v">${letzterBes}</span></div>
+    <div class="ir"><span class="ir-l">Letzte Lieferung</span><span class="ir-v">${letzteLief}</span></div>
+    <div class="ir"><span class="ir-l">Letzter Kauf</span><span class="ir-v">${letzterKauf}</span></div>
+    <div class="ir"><span class="ir-l">Ansprechpartner</span><span class="ir-v">${aps.length}</span></div>
+  </div>
+</div>
+<div class="stitle">Kennzahlen</div>
+<table class="kz"><thead><tr><th>Kennzahl</th><th style="text-align:right">Aktuell (AJ)</th><th style="text-align:right">Vorjahr (VJ)</th><th style="text-align:right">Veränderung</th></tr></thead>
+<tbody>${kennzahlenRows}</tbody></table>
+<div class="stitle">Umsatzverlauf</div>
+<div class="vbox">${verlaufSvg}</div>
+${(ziel||mit||gp)?`<div class="stitle">Besuchsvorbereitung</div>
+${ziel?`<div class="gp"><h4>Besuchsziel</h4><p>${ziel}</p></div>`:''}
+${mit?`<div class="gp"><h4>Mitnahme / Vorbereitung</h4><p>${mit}</p></div>`:''}
+${gp?`<div class="gp"><h4>Gesprächspunkte</h4><p>${gp}</p></div>`:''}
+`:''}
+${notizenHtml}
+${aps.length?`<div class="stitle page-break">Ansprechpartner</div><div class="ap-grid">${apHtml}</div>`:''}
+<div class="footer-bar">FieldCRM · Besuchsvorbereitung ${k.firma} · ${datum}</div>
+</div></body></html>`;
+
+  const win = window.open('', '_blank', 'width=920,height=750,scrollbars=yes');
+  if (!win) { alert('Popup blockiert – bitte Popups für diese Seite erlauben.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ═══════════════════════════════════════════
+// GOOGLE MAPS INTEGRATION
+// ═══════════════════════════════════════════
+let gMap = null;
+let gMapMarkers = [];
+let gMapUnknownMarkers = [];
+let gRoutesRenderer = null;
+let gMapsLoaded = false;
+
+function ladeMapsAPI() {
+  const key = localStorage.getItem('fieldcrm_mapskey');
+  if (!key) return;
+  if (document.getElementById('googleMapsScript')) return;
+  if (window.google?.maps) { gMapsLoaded = true; return; }
+
+  window.__fieldcrmMapsReady = function() {
+    gMapsLoaded = true;
+    const routeView = document.getElementById('v-route');
+    if (routeView && routeView.classList.contains('active') && !gMap) {
+      initialisiereKarte();
+    }
+  };
+
+  const script = document.createElement('script');
+  script.id    = 'googleMapsScript';
+  script.src   = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places,geometry&callback=__fieldcrmMapsReady&language=de`;
+  script.async = true;
+  script.defer = true;
+  script.onerror = () => {
+    const ph = document.getElementById('mapPlaceholder');
+    if (ph) ph.innerHTML =
+      '<i class="ti ti-alert-triangle" style="font-size:32px;color:#E24B4A"></i>' +
+      '<div style="font-size:13px;color:#A32D2D;font-weight:500;margin-top:8px">API-Key ungültig oder APIs nicht aktiviert</div>';
+  };
+  document.head.appendChild(script);
+}
+
+async function initialisiereKarte() {
+  const container = document.getElementById('googleMap');
+  if (!container || !window.google?.maps) return;
+
+  // Bereits initialisiert – nur Marker aktualisieren
+  if (gMap) {
+    const ph = document.getElementById('mapPlaceholder');
+    if (ph) ph.style.display = 'none';
+    zeichneKundenMarker();
+    return;
+  }
+
+  const ph = document.getElementById('mapPlaceholder');
+  if (ph) ph.style.display = 'none';
+
+  gMap = new google.maps.Map(container, {
+    center: { lat: 49.5897, lng: 11.0078 },
+    zoom: 8,
+    mapTypeId: 'roadmap',
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: true,
+    clickableIcons: false,
+    gestureHandling: 'greedy',
+    zoomControl: true,
+    zoomControlOptions: {
+      position: google.maps.ControlPosition.RIGHT_CENTER
+    },
+  });
+
+  gRoutesRenderer = new google.maps.DirectionsRenderer({
+    suppressMarkers: true,
+    polylineOptions: { strokeColor:'#8FBF00', strokeWeight:4, strokeOpacity:0.85 }
+  });
+  gRoutesRenderer.setMap(gMap);
+
+  setTimeout(() => {
+    if (gMap) google.maps.event.trigger(gMap, 'resize');
+  }, 500);
+
+  zeichneKundenMarker();
+}
+
+async function zeichneKundenMarker() {
+  if (!gMap) return;
+  gMapMarkers.forEach(m => { try { m.setMap(null); } catch(e){} });
+  gMapMarkers = [];
+
+  const geocoder = new google.maps.Geocoder();
+  const bounds   = new google.maps.LatLngBounds();
+  let count = 0;
+  const laender = JSON.parse(localStorage.getItem('fieldcrm_laender') || '["de"]');
+  const landStr = laender.includes('at') ? 'Österreich' : laender.includes('ch') ? 'Schweiz' : 'Deutschland';
+  const kunden  = alleKunden.filter(k => k.plz || k.ort).slice(0, 25);
+
+  for (const k of kunden) {
+    const adresse = [k.strasse, k.plz, k.ort].filter(Boolean).join(' ');
+    try {
+      const result = await new Promise(resolve =>
+        geocoder.geocode({ address: adresse + ', ' + landStr }, (r, s) =>
+          resolve(s === 'OK' && r?.[0] ? r[0] : null)
+        )
+      );
+      if (!result) continue;
+
+      const pos = result.geometry.location;
+      bounds.extend(pos);
+      count++;
+
+      const ap  = (k.ansprechpartner||[]).find(a=>a.ist_haupt) || (k.ansprechpartner||[])[0];
+      const iw  = new google.maps.InfoWindow({
+        content: `<div style="font-family:sans-serif;padding:4px 2px;min-width:190px">
+          <div style="font-weight:700;font-size:14px;margin-bottom:3px">${k.firma}</div>
+          <div style="font-size:11px;color:#5F5E5A;margin-bottom:6px">${k.plz||''} ${k.ort||''}</div>
+          ${ap ? `<div style="font-size:12px;font-weight:600;margin-bottom:3px">${ap.name}</div>
+            ${ap.telefon ? `<a href="tel:${ap.telefon.replace(/\s/g,'')}" style="display:block;font-size:12px;color:#2D6A00;margin-bottom:2px">📞 ${ap.telefon}</a>` : ''}
+            ${ap.mobil   ? `<a href="tel:${ap.mobil.replace(/\s/g,'')}"   style="display:block;font-size:12px;color:#2D6A00;margin-bottom:2px">📱 ${ap.mobil}</a>` : ''}
+            ${ap.email   ? `<a href="mailto:${ap.email}" style="display:block;font-size:12px;color:#185FA5;margin-bottom:4px">✉ ${ap.email}</a>` : ''}` : ''}
+          <button onclick="openDetail('${k.id}')" style="width:100%;padding:5px;background:#8FBF00;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">
+            Kundenprofil öffnen
+          </button>
+        </div>`,
+        maxWidth: 240
+      });
+
+      const svgIcon = {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: '#8FBF00',
+        fillOpacity: 1,
+        strokeColor: '#5a7a00',
+        strokeWeight: 2,
+        scale: 14,
+        labelOrigin: new google.maps.Point(0, 0),
+      };
+
+      const marker = new google.maps.Marker({
+        position: pos,
+        map: gMap,
+        title: k.firma,
+        icon: svgIcon,
+        label: { text: String(count), color: '#fff', fontSize: '11px', fontWeight: '700' },
+        zIndex: count,
+      });
+
+      marker.addListener('click', () => {
+        gMapMarkers.forEach(m => m._iw?.close());
+        marker._iw = iw;
+        iw.open({ anchor: marker, map: gMap });
+      });
+
+      gMapMarkers.push(marker);
+
+    } catch(e) { /* überspringen */ }
+  }
+
+  // Alle Marker einrahmen wie eine Navigations-App
+  if (!bounds.isEmpty()) {
+    gMap.fitBounds(bounds, {
+      top: 40, right: 40, bottom: 40, left: 40  // Padding in Pixeln
+    });
+    // Maximalen Zoom begrenzen damit man nicht zu tief reingezoomt wird
+    const listener = google.maps.event.addListenerOnce(gMap, 'bounds_changed', () => {
+      if (gMap.getZoom() > 13) gMap.setZoom(13);
+    });
+  }
+}
+
+async function sucheUnbekannteOnRoute() {
+  if (!gMap) {
+    alert('Bitte zuerst Google Maps API-Key in den Einstellungen hinterlegen.');
+    return;
+  }
+
+  const listEl = document.getElementById('unknownList');
+  const badge  = document.getElementById('unknownCount');
+  listEl.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:10px 0"><i class="ti ti-loader" style="font-size:14px"></i> Suche läuft…</div>';
+
+  const placesTypes = JSON.parse(localStorage.getItem('fieldcrm_places_types') || '[]');
+  const suchTypen = placesTypes.length ? placesTypes.slice(0, 3) : ['store', 'florist', 'home_goods_store'];
+
+  gMapUnknownMarkers.forEach(m => { try { m.map = null; } catch(e){} });
+  gMapUnknownMarkers = [];
+
+  const { Place, SearchNearbyRankPreference } = await google.maps.importLibrary('places');
+  const center = gMap.getCenter();
+  const bekannteNamen = alleKunden.map(k => k.firma.toLowerCase());
+  let gefundene = [];
+
+  for (const typ of suchTypen) {
+    try {
+      const request = {
+        fields: ['displayName','formattedAddress','location','rating','types','businessStatus'],
+        locationRestriction: {
+          center,
+          radius: 15000,
+        },
+        includedTypes: [typ],
+        maxResultCount: 20,
+        rankPreference: SearchNearbyRankPreference.DISTANCE,
+        language: 'de',
+      };
+      const { places } = await Place.searchNearby(request);
+      places.forEach(p => {
+        const name = p.displayName || '';
+        const isKunde = bekannteNamen.some(bn =>
+          name.toLowerCase().includes(bn) || bn.includes(name.toLowerCase())
+        );
+        if (!isKunde && !gefundene.find(g => g.id === p.id)) {
+          gefundene.push(p);
+        }
+      });
+    } catch(e) { console.warn('Places-Suche Fehler:', e); }
+  }
+
+  if (!gefundene.length) {
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--color-text-tertiary);padding:10px 0">Keine unbekannten Firmen gefunden</div>';
+    if (badge) badge.textContent = '0';
+    return;
+  }
+
+  if (badge) badge.textContent = gefundene.length;
+  const sichtbar = document.getElementById('unknownToggle')?.classList.contains('on') !== false;
+
+  listEl.innerHTML = gefundene.slice(0, 15).map((p, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--color-border-tertiary)">
+      <div class="toggle on" onclick="toggleUnknownFirm(this,'p${i}')"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.displayName||'–'}</div>
+        <div style="font-size:11px;color:var(--color-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.formattedAddress||''}</div>
+        ${p.rating ? `<div style="font-size:11px;color:#854F0B">★ ${p.rating}</div>` : ''}
+      </div>
+      <button class="btn" style="padding:3px 8px;font-size:11px;flex-shrink:0"
+        onclick="addUnknownToRoute('${(p.displayName||'').replace(/'/g,"\\'")}','${(p.formattedAddress||'').replace(/'/g,"\\'")}')">
+        <i class="ti ti-plus" style="font-size:11px"></i>Route
+      </button>
+    </div>`).join('');
+
+  // Marker setzen – klassisch, keine Map ID nötig
+  for (let i = 0; i < Math.min(gefundene.length, 15); i++) {
+    const p = gefundene[i];
+    if (!p.location) continue;
+    const iw = new google.maps.InfoWindow({
+      content: `<div style="font-family:sans-serif;padding:4px">
+        <div style="font-weight:700;font-size:13px">${p.displayName||'–'}</div>
+        <div style="font-size:11px;color:#5F5E5A;margin:3px 0">${p.formattedAddress||''}</div>
+        ${p.rating ? `<div style="font-size:11px">★ ${p.rating}</div>` : ''}
+      </div>`,
+      maxWidth: 220
+    });
+    const marker = new google.maps.Marker({
+      position: p.location,
+      map: sichtbar ? gMap : null,
+      title: p.displayName,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: '#E24B4A',
+        fillOpacity: 0.95,
+        strokeColor: '#b03030',
+        strokeWeight: 2,
+        scale: 11,
+      },
+    });
+    marker.addListener('click', () => iw.open({ anchor: marker, map: gMap }));
+    gMapUnknownMarkers.push(marker);
+  }
+}
+
+function toggleUnknownPins() {
+  const toggle = document.getElementById('unknownToggle');
+  const legend = document.getElementById('unknownLegend');
+  if (!toggle) return;
+  toggle.classList.toggle('on');
+  const sichtbar = toggle.classList.contains('on');
+  gMapUnknownMarkers.forEach(m => { try { m.setMap(sichtbar ? gMap : null); } catch(e){} });
+  if (legend) legend.style.opacity = sichtbar ? '1' : '0.3';
+}
+
+async function optimiereRoute() {
+  if (!gMap) { alert('Google Maps nicht geladen.'); return; }
+  const kunden = alleKunden.filter(k => k.plz || k.ort).slice(0, 8);
+  if (kunden.length < 2) { alert('Mindestens 2 Kunden mit Adresse benötigt.'); return; }
+
+  const laender = JSON.parse(localStorage.getItem('fieldcrm_laender') || '["de"]');
+  const landStr = laender.includes('at') ? 'Österreich' : laender.includes('ch') ? 'Schweiz' : 'Deutschland';
+  const adresse = k => [k.strasse, k.plz, k.ort].filter(Boolean).join(' ') + ', ' + landStr;
+
+  const ds = new google.maps.DirectionsService();
+  ds.route({
+    origin:      adresse(kunden[0]),
+    destination: adresse(kunden[kunden.length-1]),
+    waypoints:   kunden.slice(1,-1).map(k => ({ location: adresse(k), stopover: true })),
+    optimizeWaypoints: true,
+    travelMode: google.maps.TravelMode.DRIVING,
+    region: laender[0] || 'de'
+  }, (result, status) => {
+    if (status === 'OK') {
+      gRoutesRenderer.setDirections(result);
+    } else {
+      alert('Route konnte nicht berechnet werden: ' + status);
+    }
+  });
+}
+
+function starteNavigation() {
+  const kunden = alleKunden.filter(k => k.plz || k.ort).slice(0, 10);
+  if (!kunden.length) { alert('Keine Kunden mit Adresse.'); return; }
+  const adressen = kunden.map(k =>
+    encodeURIComponent([k.strasse, k.plz, k.ort].filter(Boolean).join(' '))
+  );
+  window.open(`https://www.google.com/maps/dir/${adressen.join('/')}`, '_blank');
+}
+
+// ═══════════════════════════════════════════
+// MOBILE SIDEBAR
+// ═══════════════════════════════════════════
+function toggleSidebar() {
+  const sidebar  = document.getElementById('sidebar');
+  const overlay  = document.getElementById('mobileOverlay');
+  const isOpen   = sidebar.classList.contains('open');
+  if (isOpen) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  } else {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+  }
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mobileOverlay').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════
+// 12. NAVIGATION
+// ═══════════════════════════════════════════
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
+  const el = document.getElementById('v-'+id);
+  if (el) el.classList.add('active');
+  const titles = { dashboard:'Dashboard', kunden:'Kunden', route:'Route & Karte', kalender:'Kalender', vorbereitung:'Besuchsvorbereitung', import:'CSV-Import', einstellungen:'Einstellungen' };
+  document.getElementById('view-title').textContent = titles[id]||id;
+  document.querySelectorAll('nav a').forEach(a=>{ if((a.getAttribute('onclick')||'').includes("'"+id+"'")) a.classList.add('active'); });
+  closeDetail();
+  if (window.innerWidth <= 768) closeSidebar();
+  if (id==='route') {
+    updateRoute();
+    if (!gMap) {
+      if (gMapsLoaded) initialisiereKarte();
+      else ladeMapsAPI();
+    }
+  }
+  if (id==='kalender') buildCalendar();
+  if (id==='einstellungen') {
+    document.getElementById('cfgUrl').value = SUPABASE_URL;
+    document.getElementById('cfgKey').value = SUPABASE_KEY;
+    initEinstellungen();
+  }
+}
+
+// ═══════════════════════════════════════════
+// 13. START
+// ═══════════════════════════════════════════
+(async () => {
+  initSupabase(SUPABASE_URL, SUPABASE_KEY);
+  await checkAndSetStatus();
+  await ladeKunden();
+  buildCalendar();
+  document.getElementById('view-badge').textContent = alleKunden.length + ' Kunden';
+  // Maps wird erst geladen wenn Route & Karte geöffnet wird
+})();
+</script>
+
+
+</body>
+</html>
